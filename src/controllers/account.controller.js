@@ -146,7 +146,7 @@ console.log("Login request body:", req.body);
         httpOnly: true,
         secure: true,
         //  sameSite: 'lax',
-        samesite:'none'
+        sameSite:'none'
        
     };
 
