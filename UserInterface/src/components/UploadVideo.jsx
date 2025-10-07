@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom'
 import React, { useState } from 'react';
-
+const API_BASE = import.meta.env.VITE_API_URL;
 function UploadVideo() {
     const [isModalOpen, setIsModalOpen] = useState(true);
     const [title, setTitle] = useState("");
@@ -35,7 +35,7 @@ function UploadVideo() {
 
         try {
             setLoader(true)
-            const res = await axios.post('/api/v1/videos/publish', formData, {
+            const res = await axios.post(`${API_BASE}/api/v1/videos/publish`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data'
                 }

@@ -71,7 +71,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
-
+const API_BASE = import.meta.env.VITE_API_URL;
 function SearchResults() {
   const { query } = useParams();
   const [videos, setVideos] = useState([]);
@@ -81,7 +81,7 @@ function SearchResults() {
     const fetchVideos = async () => {
       try {
         setLoading(true);
-        const res = await axios.get(`http://localhost:5000/api/v1/account/search?q=${query}`);
+        const res = await axios.get(`${API_BASE}/api/v1/account/search?q=${query}`);
         console.log(res)
         setVideos(res.data || []);
         setLoading(false);

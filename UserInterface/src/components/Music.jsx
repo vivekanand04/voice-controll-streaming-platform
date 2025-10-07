@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
+const API_BASE = import.meta.env.VITE_API_URL;
 
 // Helper to format "time ago" (same as Home)
 const timeAgo = (date) => {
@@ -34,7 +35,7 @@ const query="music"||"Music";
     const fetchVideos = async () => {
       try {
         setLoading(true);
-        const res = await axios.get(`http://localhost:5000/api/v1/account/search?q=${encodeURIComponent(query)}`);
+        const res = await axios.get(`${API_BASE}/api/v1/account/search?q=${encodeURIComponent(query)}`);
         // support multiple response shapes
         const items = res?.data?.data || res?.data?.videos || res?.data || [];
         setVideos(Array.isArray(items) ? items : []);

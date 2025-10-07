@@ -4,7 +4,7 @@ import img from "../assets/gde-najti-ssylku-na-svoj-kanal-youtube.jpg"
 import axios from 'axios'
 import { useState } from 'react'
 import { useSelector } from 'react-redux';
-
+const API_BASE = import.meta.env.VITE_API_URL;
 function Settings() {
 
     const [loader, setLoader] = useState(false)

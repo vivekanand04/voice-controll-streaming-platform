@@ -10,13 +10,14 @@ const app = express()
 //     credentials: true
 // }))
 
+
 app.use(cors({
   origin: "http://localhost:5173",   // your React app
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
 
-console.log("the valur of mogodb uri is",process.env.MONGODB_URI);
+console.log("the value of mogodb uri is",process.env.MONGODB_URI);
 
 
 // app.use(bodyParser.json())

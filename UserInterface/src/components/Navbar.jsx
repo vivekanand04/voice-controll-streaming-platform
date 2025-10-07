@@ -2421,7 +2421,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../store/slice/authSlice';
 import axios from 'axios';
 import { FiUpload, FiFileText } from "react-icons/fi";
-
+const API_BASE = import.meta.env.VITE_API_URL;
 
 function Navbar({ openChange }) {
   const [userdata, setUserData] = useState(null);
@@ -2911,7 +2911,7 @@ if (transcript.startsWith('scroll') && !transcript.includes('play') && !transcri
     const fetchUser = async () => {
       try {
         const response = await axios.get(
-          `http://localhost:5000/api/v1/account/userData/${data._id}`
+          `${API_BASE}/api/v1/account/userData/${data._id}`
         );
         console.log(response)
         setUserData(response.data.data);

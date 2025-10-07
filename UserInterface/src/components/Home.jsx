@@ -286,6 +286,8 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useRef } from "react";
+import api from "./apiClient";
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 
 // Helper to format "time ago"
@@ -312,13 +314,21 @@ function Home() {
   const [loader, setLoader] = useState(false);
   // Add this:
   // const [playingIndex, setPlayingIndex] = useState(null);
+console.log("VITE_API_URL =", import.meta.env.VITE_API_URL);
+
 
 
   useEffect(() => {
     const fetchVideos = async () => {
       try {
         setLoader(true);
-        const response = await axios.get("/api/v1/videos/allVideo");
+       
+        // const response = await axios.get(`${API_BASE}/api/v1/videos/allVideo`);
+          // const response = await api.get("/videos/allVideo");
+          const response = await axios.get(`${API_BASE}/api/v1/videos/allVideo`, { withCredentials: true });
+
+          console.log("the response homepage are",response);
+          
         setVideos(response.data.data || []);
       } catch (error) {
         console.error("Error fetching videos:", error);

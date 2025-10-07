@@ -134,7 +134,7 @@ import React, { useState, useEffect } from "react";
 import { Link, Outlet } from "react-router-dom";
 import { useSelector } from "react-redux";
 import axios from "axios";
-
+const API_BASE = import.meta.env.VITE_API_URL;
 function YourChannel() {
   const data = useSelector((state) => {
    // in component or dev console

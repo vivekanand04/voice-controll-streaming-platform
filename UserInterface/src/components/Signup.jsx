@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { register } from '../store/slice/authSlice';
-
+const API_BASE = import.meta.env.VITE_API_URL;
 function Signup() {
 
     const [loader, setLoader] = useState(false)

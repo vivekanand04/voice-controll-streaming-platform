@@ -215,7 +215,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux'
 import { FiFileText } from 'react-icons/fi';
-
+const API_BASE = import.meta.env.VITE_API_URL;
 
 function Sidebar({ hidden }) {
 
@@ -281,7 +281,7 @@ function Sidebar({ hidden }) {
                     headers['Authorization'] = `Bearer ${user.token}`;
                 }
 
-                const res = await fetch('http://localhost:5000/api/v1/subs/mine', {
+                const res = await fetch(`${API_BASE}/api/v1/subs/mine`, {
                     method: 'GET',
                     headers,
                     // if you rely on session cookies, include credentials

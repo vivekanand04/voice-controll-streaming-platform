@@ -2,6 +2,8 @@ import axios from 'axios';
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import api from './apiClient';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 // user all videos
 
@@ -16,7 +18,8 @@ function AllVideo() {
     const fetchVideos = async () => {
       try {
         setLoader(true)
-        const response = await axios.get(`/api/v1/videos/allUserVideo/${userdata._id}`);
+        const response = await axios.get(`${API_BASE}/api/v1/videos/allUserVideo/${userdata._id}`, { withCredentials: true });
+        //  const response = await api.get(`/api/v1/videos/allUserVideo/${userdata._id}`);
         console.log("the response value are",response);
         setVideos(response.data?.data || []);
         setLoader(false)
@@ -34,7 +37,7 @@ function AllVideo() {
         // console.log(videoId);
       try {
         setLoader(true)
-        await axios.delete(`/api/v1/videos/delete/${videoId}`);
+        await axios.delete(`${API_BASE}/api/v1/videos/delete/${videoId}`);
         setVideos(videos.filter(video => video._id !== videoId));
         setLoader(false)
         alert(" Video deleted Successfully ! ")

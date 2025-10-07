@@ -3264,7 +3264,7 @@
 import axios from 'axios';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 
-
+const API_BASE = import.meta.env.VITE_API_URL;
 
 function Video() {
   const API = import.meta.env.VITE_API_URL || "";

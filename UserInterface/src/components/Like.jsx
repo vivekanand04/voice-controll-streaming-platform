@@ -5,6 +5,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRef } from "react";
+const API_BASE = import.meta.env.VITE_API_URL;
 /**
  * Show ALL liked videos on a single page.
  * - Requests a very large `limit` so backend returns all liked videos in one response.
@@ -120,7 +121,7 @@ export default function Like() {
   const [error, setError] = useState(null);
 
   // change this if your backend base is different
-  const apiBase = "http://localhost:5000/api/v1";
+  // const apiBase = "http://localhost:5000/api/v1";
 
 
 //voice commad
@@ -177,7 +178,7 @@ useEffect(() => {
     setError(null);
     try {
       const qs = new URLSearchParams({ page: 1, limit: ALL_LIMIT });
-      const res = await fetch(`${apiBase}/likes/videos?${qs.toString()}`, {
+      const res = await fetch(`$${API_BASE}/api/v1/likes/videos?${qs.toString()}`, {
         headers: {
           "Content-Type": "application/json",
           ...getAuthHeader(),
@@ -219,7 +220,7 @@ useEffect(() => {
     setError(null);
 
     try {
-      const res = await fetch(`${apiBase}/likes/video/${videoId}`, {
+      const res = await fetch(`$${API_BASE}/api/v1/likes/video/${videoId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

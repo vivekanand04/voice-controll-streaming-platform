@@ -93,7 +93,7 @@
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
-
+const API_BASE = import.meta.env.VITE_API_URL;
 const initialState = {
     user: null,
     loading: false,
@@ -103,27 +103,27 @@ const initialState = {
     status: false,
 };
 
-export const register = createAsyncThunk('/api/v1/account/signup', async (userData, { rejectWithValue }) => {
+export const register = createAsyncThunk(`${API_BASE}/api/v1/account/signup`, async (userData, { rejectWithValue }) => {
     try {
-        const response = await axios.post('/api/v1/account/signup', userData);
+        const response = await axios.post(`${API_BASE}/api/v1/account/signup`, userData);
         return response.data.data;
     } catch (error) {
         return rejectWithValue(error.response.data.message);
     }
 });
 
-export const login = createAsyncThunk('/api/v1/account/login', async (userData, { rejectWithValue }) => {
+export const login = createAsyncThunk(`${API_BASE}api/v1/account/login`, async (userData, { rejectWithValue }) => {
     try {
-        const response = await axios.post('/api/v1/account/login', userData);
+        const response = await axios.post(`${API_BASE}/api/v1/account/login`, userData);
         return response.data.data;
     } catch (error) {
         return rejectWithValue(error.response.data.message);
     }
 });
 
-export const logout = createAsyncThunk('/api/v1/account/logout', async (_, { rejectWithValue }) => {
+export const logout = createAsyncThunk(`${API_BASE}/api/v1/account/logout`, async (_, { rejectWithValue }) => {
     try {
-        await axios.post('/api/v1/account/logout');
+        await axios.post(`${API_BASE}/api/v1/account/logout`);
         return true;
     } catch (error) {
         return rejectWithValue(error.response.data.message);

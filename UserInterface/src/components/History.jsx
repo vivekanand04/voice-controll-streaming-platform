@@ -7,7 +7,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
 import { useRef } from "react";
-
+const API_BASE = import.meta.env.VITE_API_URL;
 import { useNavigate } from "react-router-dom";
 
 /**
@@ -116,7 +116,7 @@ const pendingIndexRef = useRef(null);
       setIsLoading(true);
       setError(null);
       try {
-        const response = await axios.get("/api/v1/account/history");
+        const response = await axios.get(`${API_BASE}/api/v1/account/history`);
         // backend might return response.data.data or response.data
         const data = response?.data?.data ?? response?.data ?? [];
         setHistory(Array.isArray(data) ? data : []);
@@ -267,103 +267,3 @@ const pendingIndexRef = useRef(null);
 }
 
 
-
-
-// //implementing voice command
-// import { useNavigate } from "react-router-dom";
-// import { useRef, useEffect, useState } from "react";
-// import axios from "axios";
-// import { Link } from "react-router-dom";
-
-// export default function History() {
-//   const [history, setHistory] = useState([]);
-//   const [isLoading, setIsLoading] = useState(true);
-//   const pendingIndexRef = useRef(null);
-//   const navigate = useNavigate();
-
-//   useEffect(() => {
-//     const fetchHistory = async () => {
-//       try {
-//         setIsLoading(true);
-//         const response = await axios.get("/api/v1/account/history");
-//         const data = response?.data?.data ?? response?.data ?? [];
-//         setHistory(Array.isArray(data) ? data : []);
-//       } catch (err) {
-//         console.error("Error fetching history:", err);
-//       } finally {
-//         setIsLoading(false);
-//       }
-//     };
-//     fetchHistory();
-//   }, []);
-
-//   useEffect(() => {
-//     const handler = (e) => {
-//       const idx = Number(e?.detail?.index);
-//       if (!idx || idx <= 0) return;
-//       if (history.length > 0) {
-//         const vid = history[idx - 1];
-//         if (vid && vid._id) navigate(`/watch/${vid._id}`);
-//         else alert(`No video found at index ${idx}`);
-//       } else {
-//         pendingIndexRef.current = idx;
-//       }
-//     };
-//     window.addEventListener("play-index", handler);
-//     return () => window.removeEventListener("play-index", handler);
-//   }, [history, navigate]);
-
-//   useEffect(() => {
-//     if (pendingIndexRef.current && history.length > 0) {
-//       const idx = pendingIndexRef.current;
-//       pendingIndexRef.current = null;
-//       const vid = history[idx - 1];
-//       if (vid && vid._id) navigate(`/watch/${vid._id}`);
-//       else alert(`No video found at index ${idx}`);
-//     }
-//   }, [history, navigate]);
-
-//   return (
-//     <div className="p-6 lg:mt-12 bg-gray-50 min-h-screen">
-//       <h1 className="text-4xl font-extrabold mb-6">Watch History</h1>
-//       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-//         {isLoading
-//           ? Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)
-//           : history.map((video, index) => (
-//               <div key={video._id} className="flex flex-col">
-//                 <Link to={`/watch/${video._id}`} className="relative">
-//                   <img src={video.thumbnail} alt={video.title} className="w-full h-48 object-cover rounded-lg" />
-//                   <div className="absolute left-0 top-1/2 -translate-y-1/2 -ml-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded-xl">
-//                     {index + 1}
-//                   </div>
-//                 </Link>
-//                 <div className="flex mt-3">
-//                   <img src={video.owner?.avatar} alt="" className="w-10 h-10 rounded-full mr-3" />
-//                   <div className="flex flex-col">
-//                     <Link to={`/watch/${video._id}`} className="font-semibold text-sm line-clamp-2">
-//                       {video.title}
-//                     </Link>
-//                     <span className="text-gray-500 text-xs">{video.owner?.name || "Unknown"}</span>
-//                   </div>
-//                 </div>
-//               </div>
-//             ))}
-//       </div>
-//     </div>
-//   );
-// }
-
-// function SkeletonCard() {
-//   return (
-//     <div className="animate-pulse bg-white rounded-2xl overflow-hidden shadow-sm">
-//       <div className="bg-gray-200 h-40 w-full" />
-//       <div className="p-4">
-//         <div className="h-4 bg-gray-200 rounded w-3/4 mb-3" />
-//         <div className="flex items-center space-x-3">
-//           <div className="w-10 h-10 rounded-full bg-gray-200" />
-//           <div className="w-1/2 h-3 bg-gray-200 rounded" />
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }

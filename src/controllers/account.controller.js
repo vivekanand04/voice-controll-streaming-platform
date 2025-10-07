@@ -144,7 +144,10 @@ console.log("Login request body:", req.body);
 
     const options = {
         httpOnly: true,
-        secure: true
+        secure: true,
+        //  sameSite: 'lax',
+        samesite:'none'
+       
     };
 
     return res
