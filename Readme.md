@@ -1,74 +1,87 @@
-# YouTube Clone
+IndiaTube is a next-generation video streaming experience built around natural voice control. Every common action — playing, pausing, seeking, changing speed, toggling fullscreen or picture-in-picture, opening comments and even posting short voice comments — can be performed by speaking plain English. The navbar listens for global commands and forwards them to the player so you can navigate the site hands-free. IndiaTube is designed for accessibility and speed: voice search finds content instantly, voice comments let you post feedback in under 10 seconds, and publishing/upload actions are available via spoken commands. If you prefer, use the quick command reference below to learn exact phrases and expected behavior.
 
-This project is a full-stack YouTube clone built with the MERN stack (MongoDB, Express, React, Node.js). It includes features such as user authentication, video uploading, playback, commenting, and liking. The application is fully responsive, ensuring a seamless experience across both desktop and mobile devices.
+Live URL:https://voice-controll-streaming-platform.onrender.com
 
-## Technolgies Used
+Command Reference
 
-- Vite + React
-- React Router
-- React Redux
-- Redux-toolkit
-- Tailwind CSS
-- Axios
-- Node.js
-- Express.js
-- MongoDB
-- Mongoose
-- Jwt
-- Bycrypt
-- Multer
-- Cloudinary
+How to use: say a phrase similar to the examples below. Short pauses and clear pronunciation improve recognition. Commands are case-insensitive and support numeric words (for example, “three”, “ten seconds”).
 
-## Screenshots
+Backward / Rewind
+Examples: backword 10, rewind 5 seconds, skip back
+Function: Seeks the current video backward by the specified number of seconds (defaults to 10s if unspecified).
 
-![alt text](<public/assetGitHub/Screenshot 2024-06-05 004833.png>)
+Create message (voice comment)
+Examples: create message, record message
+Function: Opens a short (~10s) voice recorder, converts speech to text, and posts the comment to the video.
 
-![alt text](<public/assetGitHub/Screenshot 2024-06-05 004853.png>)
+Forward / Skip forward
+Examples: forward 10, forward ten seconds, skip forward 30
+Function: Seeks forward by the specified seconds (supports digits or words).
 
-![alt text](<public/assetGitHub/Screenshot 2024-05-29 113205.png>)
+Fullscreen / Exit fullscreen
+Examples: fullscreen, exit fullscreen
+Function: Toggles fullscreen for the video player.
 
-![alt text](<public/assetGitHub/Screenshot 2024-06-05 005225.png>)
+Login / Signup / Logout
+Examples: login, signup, logout, sign out
+Function: Opens authentication pages or logs the user out.
 
-![alt text](<public/assetGitHub/Screenshot 2024-06-05 005116.png>)
+Mute / Unmute
+Examples: mute, unmute
+Function: Toggles the audio mute state.
 
-![alt text](<public/assetGitHub/Screenshot 2024-06-05 005243.png>)
+Navigate (pages)
+Examples: go home, open settings, open history, open subscriptions
+Function: Navigates the site to the requested page.
 
-![alt text](<public/assetGitHub/Screenshot 2024-06-05 004949.png>)
+Open / Close comments
+Examples: open comments, close comments
+Function: Opens or closes the comments UI.
 
-![alt text](<public/assetGitHub/Screenshot 2024-06-05 005329.png>)
+Pause / Stop
+Examples: pause, stop
+Function: Pauses playback immediately.
 
-![alt text](<public/assetGitHub/Screenshot 2024-06-05 005056.png>)
+Picture-in-Picture (PIP)
+Examples: picture in picture, pip
+Function: Toggles Picture-in-Picture mode if the browser supports it.
 
-![alt text](<public/assetGitHub/Screenshot 2024-06-05 005141.png>)
+Play
+Examples: play, play video
+Function: Starts or resumes playback.
 
-![alt text](<public/assetGitHub/Screenshot 2024-06-05 005200.png>)
+Play index
+Examples: play 3, play three, open 2
+Function: Opens a recommended video by 1-based index (useful for the recommended list).
 
+Resume
+Examples: resume
+Function: Resumes playback (useful after pause/stop).
 
-![alt text](<public/assetGitHub/Screenshot 2024-06-05 005407.png>)
+Search (start voice query)
+Examples: search for funny cats, search avengers trailer
+Function: Opens voice search input, collects your query, and runs the site search.
 
+Speed controls
+Examples: slow, normal, double, faster
+Function: Adjusts playbackRate (for example, 0.5, 1, 2, or incremental changes).
 
-## Features
+Toggle like (thumbs up)
+Examples: thumbs up, toggle thumbs, like
+Function: Likes or unlikes the current video.
 
-- Authentication
-- CRUD functionality in videos
-- Like's and Comment's
-- Watch history
-- View's Count
+Toggle subscribe
+Examples: toggle subscribe, subscribe
+Function: Subscribes or unsubscribes to the current channel.
 
-## Conclusion
+Upload
+Examples: upload, upload video
+Function: Navigates to the upload page to add new content.
 
-By developing this project, we have acquired a deeper understanding of various web development concepts and technologies, including front-end development with React, back-end development with Express and Node.js, database management with MongoDB. We have also learned how to address common challenges in web application development, such as scalability, performance optimization, and security.
+Volume decrease
+Examples: decrease volume, volume down
+Function: Lowers playback volume by a small step.
 
-
-## References
-
-1.	MongoDB Documentation: https://docs.mongodb.com/
-2.	Express.js Documentation: https://expressjs.com/
-3.	React Documentation:https://reactjs.org/docs/gettingstarted.html
-4.	Node.js Documentation: https://nodejs.org/en/docs/
-5.	JSON Web Tokens: https://jwt.io/introduction/
-6.	Bcrypt Documentation: https://www.npmjs.com/package/bcrypt
-7.	Redux Documentation: https://redux.js.org/
-8.	Axios Documentation: https://axios-http.com/docs/intro
-9.	Tailwind CSS Documentation: https://tailwindcss.com/docs
-
+Volume increase
+Examples: increase volume, volume up
+Function: Raises playback volume by a small step.
