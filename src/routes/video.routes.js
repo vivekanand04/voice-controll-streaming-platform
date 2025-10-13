@@ -16,7 +16,7 @@ const videoUpload = upload.fields([
   router.use(verifyJWT); // Apply verifyJWT middleware to all routes in this file
 
 
-router.route("/publish").post(videoUpload , publishAVideo )
+router.route("/publish").post( videoUpload ,publishAVideo )
 router.route("/allVideo").get(getAllVideos)
 router.route("/allUserVideo/:owner").get(getAllUserVideos)
 router.route("/delete/:id").delete(deleteVideoById)

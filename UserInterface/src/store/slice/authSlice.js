@@ -112,14 +112,23 @@ export const register = createAsyncThunk(`${API_BASE}/api/v1/account/signup`, as
     }
 });
 
-export const login = createAsyncThunk(`${API_BASE}api/v1/account/login`, async (userData, { rejectWithValue }) => {
+// export const login = createAsyncThunk(`${API_BASE}api/v1/account/login`, async (userData, { rejectWithValue }) => {
+//     try {
+//         const response = await axios.post(`${API_BASE}/api/v1/account/login`, userData);
+//         return response.data.data;
+//     } catch (error) {
+//         return rejectWithValue(error.response.data.message);
+//     }
+// });
+export const login = createAsyncThunk(`${API_BASE}/api/v1/account/login`, async (userData, { rejectWithValue }) => {
     try {
-        const response = await axios.post(`${API_BASE}/api/v1/account/login`, userData);
+        const response = await axios.post(`${API_BASE}/api/v1/account/login`, userData, { withCredentials: true });
         return response.data.data;
     } catch (error) {
-        return rejectWithValue(error.response.data.message);
+        return rejectWithValue(error.response?.data?.message || error.message);
     }
 });
+
 
 export const logout = createAsyncThunk(`${API_BASE}/api/v1/account/logout`, async (_, { rejectWithValue }) => {
     try {

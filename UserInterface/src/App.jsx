@@ -3,7 +3,8 @@
 import { Navbar, Sidebar } from "./components";
 import { Navigate, Outlet } from 'react-router-dom';
 import { useState, useEffect } from "react";
-import axios from "axios";
+// import axios from "axios";
+import "./api/axios"; 
 import { useDispatch } from "react-redux";
 import { setUser } from "./store/slice/authSlice"; // you need this action
 const API_BASE = import.meta.env.VITE_API_URL;

@@ -142,13 +142,24 @@ console.log("Login request body:", req.body);
 
     const loggedInUser = await newUser.findById(userfind._id).select("-refreshToken");
 
-    const options = {
-        httpOnly: true,
-        secure: true,
-        //  sameSite: 'lax',
-        sameSite:'none'
+    // const options = {
+    //     httpOnly: true,
+    //     // secure: true,
+    //       secure: false,
+    //      sameSite: 'lax',
+    //     // sameSite:'none'
+    //     maxAge: 7 * 24 * 60 * 60 * 1000
        
-    };
+    // };
+    const isProd = process.env.NODE_ENV === "production";
+
+const options = {
+  httpOnly: true,
+  secure: isProd,
+  sameSite: isProd ? "none" : "lax",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+  path: "/"
+};
 
     return res
         .status(200)

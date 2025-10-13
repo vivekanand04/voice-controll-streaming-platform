@@ -36,9 +36,10 @@ function UploadVideo() {
         try {
             setLoader(true)
             const res = await axios.post(`${API_BASE}/api/v1/videos/publish`, formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data'
-                }
+                // headers: {
+                //     'Content-Type': 'multipart/form-data'
+                // }
+                 withCredentials: true
             });
 
             alert("Successfully Video Uploaded");

@@ -10,12 +10,17 @@ const app = express()
 //     credentials: true
 // }))
 
+app.set('trust proxy', 1); // if behind proxy/load-balancer
 
+
+app.use(cookieParser())
 app.use(cors({
-  origin: process.env.FRONTEND_URL,   // your React app
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
+  origin:process.env.FRONTEND_URL || 'http://localhost:5173',   // your React app
+  methods: ["GET","POST","PUT","DELETE"],
+  credentials: true,
+    // allowedHeaders: ["Content-Type", "Authorization", "Accept"]
 }));
+// app.options("*", cors());
 
 console.log("the value of mogodb uri is",process.env.MONGODB_URI);
 
@@ -24,7 +29,7 @@ console.log("the value of mogodb uri is",process.env.MONGODB_URI);
 app.use(express.json({limit: "700mb"}))
 app.use(express.urlencoded({extended: true, limit: "700mb"}))
 app.use(express.static("public"))
-app.use(cookieParser())
+
 
 
 
