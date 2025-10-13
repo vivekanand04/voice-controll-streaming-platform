@@ -70,7 +70,8 @@
 //method 2
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import axios from "axios";
+// import axios from "axios";
+import axios from "../api/axios";
 const API_BASE = import.meta.env.VITE_API_URL;
 function SearchResults() {
   const { query } = useParams();

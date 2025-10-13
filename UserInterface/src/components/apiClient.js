@@ -1,5 +1,6 @@
 // src/apiClient.js
-import axios from "axios";
+// import axios from "axios";
+import axios from "../api/axios";
 
 // your base URL — from .env
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
