@@ -4191,6 +4191,10 @@ function Video() {
 
   //rerender s
   const [render, setRender] = useState(true);
+  //unmute the autoplay
+  const [isMutedState, setIsMutedState] = useState(true);
+const [showUnmuteBtn, setShowUnmuteBtn] = useState(false);
+
 
   // number helpers (kept from your code)
   const WORD_NUMBER_MAP = {
@@ -4270,14 +4274,63 @@ function Video() {
   }, [id]);
 
   // Autoplay when videoData changes
-  useEffect(() => {
-    if (!videoData?.videoFile || !videoRef.current) return;
-    const v = videoRef.current;
-    try { v.pause(); } catch (e) { }
-    if (v.src !== videoData.videoFile) v.src = videoData.videoFile;
-    try { v.load(); v.play().catch(() => { }); } catch (e) { }
-    setRender(!render);
-  }, [videoData]);
+  // useEffect(() => {
+  //   if (!videoData?.videoFile || !videoRef.current) return;
+  //   const v = videoRef.current;
+  //   try { v.pause(); } catch (e) { }
+  //   if (v.src !== videoData.videoFile) v.src = videoData.videoFile;
+  //   try { v.load(); v.play().catch(() => { }); } catch (e) { }
+  //   setRender(!render);
+  // }, [videoData]);
+
+
+useEffect(() => {
+  if (!videoData?.videoFile || !videoRef.current) return;
+  const v = videoRef.current;
+  try { v.pause(); } catch (e) {}
+  if (v.src !== videoData.videoFile) v.src = videoData.videoFile;
+  try {
+    v.muted = true;
+    setIsMutedState(true);
+    v.load();
+    v.play().then(async () => {
+      try {
+        v.muted = false;
+        await v.play();
+        setIsMutedState(false);
+        setShowUnmuteBtn(false);
+      } catch (err) {
+        v.muted = true;
+        setIsMutedState(true);
+        setShowUnmuteBtn(true);
+      }
+    }).catch(() => {
+      setShowUnmuteBtn(true);
+    });
+  } catch (e) {
+    setShowUnmuteBtn(true);
+  }
+  setRender(prev => !prev);
+}, [videoData]);
+
+
+//unmute handler
+const handleUnmuteClick = async () => {
+  const v = videoRef.current;
+  if (!v) return;
+  try {
+    v.muted = false;
+    await v.play();
+    setIsMutedState(false);
+    setShowUnmuteBtn(false);
+  } catch (err) {
+    v.muted = true;
+    setIsMutedState(true);
+    setShowUnmuteBtn(true);
+  }
+};
+
+
 
   // === Fetch uploader data ===
   useEffect(() => {
@@ -4606,7 +4659,7 @@ function Video() {
         setTimeout(() => setStatusMessage(""), 2500);
         return;
       }
-      setStatusMessage(`Opening "${target.title}"`);
+      // setStatusMessage(`Opening "${target.title}"`);
       navigate(`/watch/${target._id}`);
       return;
     }
@@ -4785,11 +4838,36 @@ function Video() {
   return (
     <div className="flex flex-col lg:flex-row gap-6 px-4 lg:px-10 pt-6">
       <div className="lg:w-2/3">
-        <div ref={videoContainerRef} className="relative w-full aspect-video bg-black">
+        {/* <div ref={videoContainerRef} className="relative w-full aspect-video bg-black">
           <video ref={videoRef} className="w-full h-full" controls autoPlay muted playsInline>
             <source src={videoData.videoFile} type="video/mp4" />
           </video>
-        </div>
+        </div> */}
+        <div ref={videoContainerRef} className="relative w-full aspect-video bg-black">
+  <video
+    ref={videoRef}
+    className="w-full h-full"
+    controls
+    autoPlay
+    muted
+    playsInline
+  >
+    <source src={videoData.videoFile} type="video/mp4" />
+  </video>
+
+  {showUnmuteBtn && (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <button
+        onClick={handleUnmuteClick}
+        className="pointer-events-auto bg-black bg-opacity-60 text-white px-4 py-2 rounded-md"
+        aria-label="Unmute video"
+      >
+        Unmute
+      </button>
+    </div>
+  )}
+</div>
+
 
         <h1 className="my-10 text-xl font-semibold hidden sm:inline">{videoData.title}</h1>
         <h1
