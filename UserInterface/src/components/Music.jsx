@@ -57,13 +57,13 @@ const query="music"||"Music";
   }
 
   return (
-    <div className="p-4 sm:p-6 mt-3">
-      <h2 className="text-xl font-bold mb-4">
-        Filter results for: <span className="text-red-500">{query}</span>
+    <div className="p-4 sm:p-6 mt-3 ">
+      <h2 className="text-xl font-bold mt-3">
+        Filter results for: <span className="text-red-500 mt-3">{query}</span>
       </h2>
 
       {videos.length === 0 ? (
-          <h2 className="text-xl font-bold mb-4">
+          <h2 className="text-xl font-bold ">
        {/* Filter  results for: <span className="text-red-500">{query}</span> */}
            <p>No results found.</p>
       </h2>

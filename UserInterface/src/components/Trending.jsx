@@ -124,8 +124,8 @@ const query="trending"||"Trending";
   }
 
   return (
-    <div className="p-4 sm:p-6 mt-4">
-      <h2 className="text-xl font-bold mb-4">
+    <div className="p-4 sm:p-6 mt-3">
+      <h2 className="text-xl font-bold mt-3">
         Filter results for: <span className="text-red-500">{query}</span>
       </h2>
 
