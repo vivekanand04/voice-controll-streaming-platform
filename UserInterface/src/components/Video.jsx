@@ -4645,6 +4645,7 @@ const handleUnmuteClick = async () => {
     const lower = String(command).toLowerCase();
     setDetected(lower);
     setTimeout(() => setDetected(''), 5000);
+    
 
     const idx = parseIndexFromText(lower, recommended.length);
     if (idx !== null) {
@@ -4663,7 +4664,7 @@ const handleUnmuteClick = async () => {
       navigate(`/watch/${target._id}`);
       return;
     }
-
+  
     // Download/render voice commands (order matters for combined phrases)
     if (lower.includes("download and render") || lower.includes("download then render") || lower.includes("download & render")) {
       await downloadVideo();

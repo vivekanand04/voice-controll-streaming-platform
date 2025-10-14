@@ -456,7 +456,7 @@ function VideoCard({ item, onUnlike, index }) {
           <div className="flex flex-col items-end">
             <div className="text-xs text-gray-500">{formatDate(item.likedAt)}</div>
 
-            <div className="mt-2 flex items-center space-x-2">
+            {/* <div className="mt-2 flex items-center space-x-2">
               <a
                 href={`/watch/${vid._id}`}
                 className="px-3 py-1 text-xs rounded-full border border-gray-200 hover:bg-gray-50"
@@ -473,7 +473,7 @@ function VideoCard({ item, onUnlike, index }) {
               >
                 ♥ Unlike
               </button>
-            </div>
+            </div> */}
           </div>
 
         </div>
