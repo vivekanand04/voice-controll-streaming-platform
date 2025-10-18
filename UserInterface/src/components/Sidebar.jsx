@@ -393,15 +393,27 @@ function Sidebar({ hidden }) {
   <div className="sm:hidden px-3 pt-6 pb-3 border-b border-gray-200">
     <Link to="/your_channel" className="flex items-center gap-3" aria-label="Open your channel">
       {user?.avatar ? (
-        <img src={user?.avatar || backupImage} alt={user?.name || 'Profile'} className="w-10 h-10 rounded-full object-cover" />
+        <img 
+          src={user.avatar} 
+          alt={user?.name || 'Profile'} 
+          className="w-10 h-10 rounded-full object-cover"
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = backupImage;
+          }}
+        />
       ) : (
-        <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-sm font-medium">
-          {user?.name ? user.name.charAt(0).toUpperCase() : 'Y'}
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-sm font-semibold text-white">
+          {user?.name ? user.name.charAt(0).toUpperCase() : user?.email ? user.email.charAt(0).toUpperCase() : 'U'}
         </div>
       )}
-      <div className="flex flex-col">
-        <span className="text-sm font-medium text-gray-900">{user?.name || 'DemoUser'}</span>
-        <span className="text-xs text-gray-500 truncate">{user?.email || 'demo1@gmail.com'}</span>
+      <div className="flex flex-col min-w-0">
+        <span className="text-sm font-medium text-gray-900 truncate">
+          {user?.name || user?.email?.split('@')[0] || 'User'}
+        </span>
+        {user?.email && (
+          <span className="text-xs text-gray-500 truncate">{user.email}</span>
+        )}
       </div>
     </Link>
 

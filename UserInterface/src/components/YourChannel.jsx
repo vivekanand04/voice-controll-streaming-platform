@@ -157,7 +157,7 @@ console.log('auth slice:', {
   const [fetchError, setFetchError] = useState(null);
 
   // Development fallback — remove or change in production
-  const FALLBACK_ID = "68c0014613d132a0b12ca4fa";
+  // const FALLBACK_ID = "68c0014613d132a0b12ca4fa";
   // const API_BASE = "http://localhost:5000";
 
   useEffect(() => {
