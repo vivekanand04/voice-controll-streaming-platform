@@ -1,6 +1,6 @@
 import axios from 'axios';
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import api from './apiClient';
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -10,7 +10,9 @@ const API_BASE = import.meta.env.VITE_API_URL || '';
 function AllVideo() {
   const userdata = useSelector((state) => state.auth.user);
   const [videos, setVideos] = useState([]);
-  const [loader, setLoader] = useState(false)
+  const [loader, setLoader] = useState(false);
+  const navigate = useNavigate();
+  const pendingIndexRef = useRef(null);
 
   useEffect(() => {
     console.log("the userdata are",userdata)
@@ -31,6 +33,38 @@ function AllVideo() {
 
     fetchVideos();
   }, [userdata]);
+
+  // Voice-controlled video playback by index
+  useEffect(() => {
+    const handler = (e) => {
+      const idx = Number(e?.detail?.index);
+      if (!idx || idx <= 0) return;
+      if (videos.length > 0) {
+        const vid = videos[idx - 1];
+        if (vid && vid._id) {
+          navigate(`/watch/${vid._id}`);
+        } else {
+          alert(`No video found at index ${idx}`);
+        }
+      } else {
+        // videos not loaded yet — remember requested index
+        pendingIndexRef.current = idx;
+      }
+    };
+    window.addEventListener('play-index', handler);
+    return () => window.removeEventListener('play-index', handler);
+  }, [videos, navigate]);
+
+  // If there was a pending index requested before videos loaded, handle it now
+  useEffect(() => {
+    if (pendingIndexRef.current && videos.length > 0) {
+      const idx = pendingIndexRef.current;
+      pendingIndexRef.current = null;
+      const vid = videos[idx - 1];
+      if (vid && vid._id) navigate(`/watch/${vid._id}`);
+      else alert(`No video found at index ${idx}`);
+    }
+  }, [videos, navigate]);
 
   const handleDelete = async (videoId) => {
     if (confirm('Are you sure you want to delete this video?')) {
@@ -68,11 +102,20 @@ function AllVideo() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             
               {videos.length > 0 ?
-              (videos.map((video) => (
+              (videos.map((video, index) => (
                 <div key={video._id}>
                   <div className="relative">
                     <Link to={`/watch/${video._id}`}>
                       <img src={video.thumbnail} alt={video.title} className="w-80 h-40"  />
+                      {/* INDEX BADGE - Voice Command Index */}
+                      <div
+                        aria-hidden="true"
+                        className="absolute left-0 top-1/2 -translate-y-1/2 -ml-2
+                           bg-black bg-opacity-70 text-white text-md font-semibold
+                           px-2 py-1 rounded-xl shadow"
+                      >
+                        {index + 1}
+                      </div>
                     </Link>
                   </div>
                   <div className="mt-2 md:mt-0">
