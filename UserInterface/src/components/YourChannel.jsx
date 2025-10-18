@@ -158,7 +158,7 @@ console.log('auth slice:', {
 
   // Development fallback — remove or change in production
   const FALLBACK_ID = "68c0014613d132a0b12ca4fa";
-  const API_BASE = "http://localhost:5000";
+  // const API_BASE = "http://localhost:5000";
 
   useEffect(() => {
     // If you want to always test a hard-coded id in dev, don't early-return.
