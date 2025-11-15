@@ -137,7 +137,6 @@ import {
     AllVideo,
     AuthLayout,
     Main,
-    Channel,
 
 } from "../components";
 import Movies from "../components/Movies.jsx";
@@ -239,14 +238,6 @@ function Routing() {
                             element={
                                 <AuthLayout>
                                     <Video />
-                                </AuthLayout>
-                            }
-                        />
-                        <Route
-                            path="channel/:id"
-                            element={
-                                <AuthLayout>
-                                    <Channel />
                                 </AuthLayout>
                             }
                         />

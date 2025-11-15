@@ -68,8 +68,8 @@
 
 
 
-import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import React, { useEffect, useState, useRef } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 // import axios from "axios";
 import axios from "../api/axios";
 const API_BASE = import.meta.env.VITE_API_URL;
@@ -98,6 +98,8 @@ function Trending() {
 const query="trending"||"Trending";
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const pendingIndexRef = useRef(null);
 
   useEffect(() => {
     const fetchVideos = async () => {
@@ -116,6 +118,38 @@ const query="trending"||"Trending";
     };
     fetchVideos();
   }, [query]);
+
+  // handle play-index events for voice control
+  useEffect(() => {
+    const handler = (e) => {
+      const idx = Number(e?.detail?.index);
+      if (!idx || idx <= 0) return;
+      if (videos.length > 0) {
+        const vid = videos[idx - 1];
+        if (vid && vid._id) {
+          navigate(`/watch/${vid._id}`);
+        } else {
+          alert(`No video found at index ${idx}`);
+        }
+      } else {
+        // videos not loaded yet — remember requested index
+        pendingIndexRef.current = idx;
+      }
+    };
+    window.addEventListener('play-index', handler);
+    return () => window.removeEventListener('play-index', handler);
+  }, [videos, navigate]);
+
+  // if there was a pending index requested before videos loaded, handle it now
+  useEffect(() => {
+    if (pendingIndexRef.current && videos.length > 0) {
+      const idx = pendingIndexRef.current;
+      pendingIndexRef.current = null;
+      const vid = videos[idx - 1];
+      if (vid && vid._id) navigate(`/watch/${vid._id}`);
+      else alert(`No video found at index ${idx}`);
+    }
+  }, [videos, navigate]);
 
   if (loading) {
     return (

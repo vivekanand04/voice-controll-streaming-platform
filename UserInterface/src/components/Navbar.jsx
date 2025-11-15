@@ -3448,7 +3448,11 @@ function Navbar({ openChange }) {
       else if (transcript.includes('playlist')) { navigate('/playlist'); return; }
       else if (transcript.includes('like')) { navigate('/like'); return; }
       else if (transcript.includes('setting')) { navigate('/settings'); return; }
-      else if (transcript.includes('dashboard') || transcript.includes('profile') || transcript.includes('my channel')) { navigate('/your_channel'); return; }
+      else if (transcript.includes('edit channel') || transcript.includes('customize channel') || transcript.includes('edit my channel') || transcript.includes('customize my channel')) { navigate('/customize_channel'); return; }
+      else if (transcript.includes('music')) { navigate('/music'); return; }
+      else if (transcript.includes('trending')) { navigate('/trending'); return; }
+      else if (transcript.includes('movies') || transcript.includes('movie')) { navigate('/movies'); return; }
+      else if (transcript.includes('dashboard') || transcript.includes('profile') || transcript.includes('my channel') || transcript.includes('your channel')) { navigate('/your_channel'); return; }
       else if (transcript.includes('logout') || transcript.includes('sign out')) { handleSignOut(); return; }
       else if (transcript.includes('voice docs') || transcript.includes('voice command') || transcript.includes('voice command docs') || transcript.includes('docs')) { navigate('/docs'); return; }
 
@@ -3526,38 +3530,16 @@ function Navbar({ openChange }) {
 
   useEffect(() => {
     if (!data || !data._id) return;
-    
-    const controller = new AbortController();
     const fetchUser = async () => {
       try {
-        const API_BASE = import.meta.env.VITE_API_URL;
-        const url = `${API_BASE}/api/v1/account/userData/${data._id}`;
-        const headers = { 'Content-Type': 'application/json' };
-        
-        if (data?.token) {
-          headers.Authorization = `Bearer ${data.token}`;
-        }
-        
-        const response = await axios.get(url, {
-          headers,
-          withCredentials: !data?.token,
-          signal: controller.signal,
-        });
-        
-        const userObj = response?.data?.data ?? response?.data ?? null;
-        if (userObj) {
-          setUserData(userObj);
-        }
+        const response = await axios.get(`http://localhost:5000/api/v1/account/userData/${data._id}`);
+        setUserData(response.data.data);
       } catch (error) {
-        if (error.name !== 'CanceledError' && error.message !== 'canceled') {
-          console.error('Error fetching user data:', error);
-        }
+        console.error('Error fetching user data:', error);
       }
     };
-    
     fetchUser();
-    return () => controller.abort();
-  }, [data?._id, data?.token]);
+  }, [data]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-[500] w-full bg-white border-b border-gray-200">
