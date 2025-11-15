@@ -16,6 +16,7 @@ import UploadVideo from "./UploadVideo";
 import AllVideo from "./AllVideo";
 import AuthLayout from "./AuthLayout";
 import Main from "./Main";
+import Channel from "./Channel";
 
 
 export {
@@ -37,7 +38,8 @@ export {
     UploadVideo,
     AllVideo,
     AuthLayout,
-    Main
+    Main,
+    Channel
 
 
 };
