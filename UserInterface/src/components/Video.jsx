@@ -4667,7 +4667,7 @@ const handleUnmuteClick = async () => {
   // ---------------------------------------------------------------------
 
   // === Voice Command Parser (updated to include download/render) ===
-  const handleVoiceCommand = async (command) => {
+    const handleVoiceCommand = async (command) => {
     const video = videoRef.current;
     if (!video) return;
     const lower = String(command).toLowerCase();
