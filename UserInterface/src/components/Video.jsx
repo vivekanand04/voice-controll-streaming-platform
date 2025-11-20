@@ -4166,6 +4166,7 @@ function Video() {
   const [showFullDesc, setShowFullDesc] = useState(false);
   const [detected, setDetected] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
+  const [videoLoading, setVideoLoading] = useState(true);
 
   // Likes
   const [videoLikes, setVideoLikes] = useState(0);
@@ -4287,29 +4288,56 @@ const [showUnmuteBtn, setShowUnmuteBtn] = useState(false);
 useEffect(() => {
   if (!videoData?.videoFile || !videoRef.current) return;
   const v = videoRef.current;
-  try { v.pause(); } catch (e) {}
-  if (v.src !== videoData.videoFile) v.src = videoData.videoFile;
-  try {
-    v.muted = true;
-    setIsMutedState(true);
-    v.load();
-    v.play().then(async () => {
-      try {
-        v.muted = false;
-        await v.play();
-        setIsMutedState(false);
+
+  const attemptAutoplay = () => {
+    try { v.pause(); } catch (e) {}
+    if (v.src !== videoData.videoFile) v.src = videoData.videoFile;
+
+    // Wait for video to be ready before attempting autoplay
+    if (v.readyState >= 2) { // HAVE_CURRENT_DATA or higher
+      tryAutoplay();
+    } else {
+      // Wait for video to be ready
+      const onCanPlay = () => {
+        v.removeEventListener('canplay', onCanPlay);
+        tryAutoplay();
+      };
+      v.addEventListener('canplay', onCanPlay);
+    }
+  };
+
+  const tryAutoplay = () => {
+    try {
+      // Try to autoplay unmuted first
+      v.muted = false;
+      setIsMutedState(false);
+      v.play().then(() => {
+        // Video started playing unmuted successfully
         setShowUnmuteBtn(false);
-      } catch (err) {
-        v.muted = true;
-        setIsMutedState(true);
-        setShowUnmuteBtn(true);
-      }
-    }).catch(() => {
+        setVideoLoading(false);
+      }).catch(() => {
+        // Autoplay with sound blocked, try muted autoplay
+        try {
+          v.muted = true;
+          setIsMutedState(true);
+          return v.play().then(() => {
+            // Muted autoplay succeeded, show unmute button
+            setShowUnmuteBtn(true);
+            setVideoLoading(false);
+          });
+        } catch (mutedErr) {
+          // Both failed, show unmute button
+          setShowUnmuteBtn(true);
+          setVideoLoading(false);
+        }
+      });
+    } catch (e) {
       setShowUnmuteBtn(true);
-    });
-  } catch (e) {
-    setShowUnmuteBtn(true);
-  }
+      setVideoLoading(false);
+    }
+  };
+
+  attemptAutoplay();
   setRender(prev => !prev);
 }, [videoData]);
 
@@ -4850,11 +4878,21 @@ const handleUnmuteClick = async () => {
     className="w-full h-full"
     controls
     autoPlay
-    muted
     playsInline
+    preload="auto"
+    onLoadStart={() => setVideoLoading(true)}
+    onCanPlay={() => setVideoLoading(false)}
+    onCanPlayThrough={() => setVideoLoading(false)}
+    onError={() => setVideoLoading(false)}
   >
     <source src={videoData.videoFile} type="video/mp4" />
   </video>
+
+  {videoLoading && (
+    <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="text-white text-lg">Loading video...</div>
+    </div>
+  )}
 
   {showUnmuteBtn && (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

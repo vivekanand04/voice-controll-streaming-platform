@@ -3141,7 +3141,7 @@ function Navbar({ openChange }) {
   const recognitionRef = useRef(null);
   const queryRecRef = useRef(null);
 
-  // Scroll helpers (unchanged from your logic)
+  // Scroll helpers 
   const scrollRef = useRef({
     running: false,
     direction: 1,
@@ -3263,7 +3263,7 @@ function Navbar({ openChange }) {
 
   const toggleSidebar = () => { openChange(); };
   const toggleDropdown = () => { setDropdownVisible(!dropdownVisible); };
-  const handleSignOut = () => { dispatch(logout()); };
+  const handleSignOut = () => { dispatch(logout()); };  
 
   const handleSearch = (e) => {
     e.preventDefault();
