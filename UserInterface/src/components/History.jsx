@@ -11,18 +11,7 @@ import { useRef } from "react";
 const API_BASE = import.meta.env.VITE_API_URL;
 import { useNavigate } from "react-router-dom";
 
-/**
- * Updated History component
- * - Beautiful heading
- * - Shows channel (avatar + name), views (abbreviated), upload time (relative + full on hover)
- * - Thumbnail with duration overlay
- * - Responsive grid and skeleton loading cards
- *
- * Assumptions:
- * - API returns the history array at response.data.data OR response.data
- * - Each video item has: _id, thumbnail, title, owner{_id, name, avatar}, views, createdAt, duration
- * - Adjust axios base URL / headers if your app requires auth
- */
+
 
 function formatViews(num = 0) {
   if (num < 1000) return `${num}`;
