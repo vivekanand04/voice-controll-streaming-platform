@@ -1,0 +1,2116 @@
+
+
+QUESTION 1: How is the Web Speech API implemented for voice recognition?
+
+ANSWER:
+
+The Web Speech API is implemented using the browser's native SpeechRecognition API with fallback support for WebKit browsers.
+
+Step-by-Step Control Flow:
+
+1. Browser Compatibility Check (Navbar.jsx, lines 209-213):
+The code checks for browser support by looking for either SpeechRecognition or webkitSpeechRecognition:
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SpeechRecognition) {
+  alert('Your browser does not support voice commands.');
+  return;
+}
+
+2. Recognition Instance Creation (Navbar.jsx, line 221):
+A new recognition instance is created with specific configuration:
+
+const recognition = new SpeechRecognition();
+recognition.lang = 'en-US';
+recognition.interimResults = false;
+recognition.maxAlternatives = 1;
+
+3. Event Handlers Setup:
+   - onstart: Sets listening state (lines 225-229)
+   - onresult: Processes transcript (lines 231-350)
+   - onerror: Handles errors (lines 352-354)
+   - onend: Cleans up (lines 355-359)
+
+4. Recognition Start (Navbar.jsx, line 361):
+The recognition is started with:
+
+recognition.start();
+
+Key Differences:
+- SpeechRecognition: Standard API used in Chrome and Edge
+- webkitSpeechRecognition: WebKit prefix used in Safari and older Chrome versions
+- Both are functionally identical; the code uses OR operator for fallback
+
+File: UserInterface/src/components/Navbar.jsx
+Lines: 207-362
+
+
+QUESTION 2: How do you prevent multiple recognition instances from conflicting?
+
+ANSWER:
+
+The system prevents conflicts by:
+1. Aborting existing instances before starting new ones
+2. Using refs to track active recognition
+3. Stopping recognition immediately after result
+
+Control Flow:
+
+1. Check and Abort Existing (Navbar.jsx, lines 216-219):
+Before starting new recognition, any existing instance is aborted:
+
+if (recognitionRef.current) {
+  try { recognitionRef.current.abort(); } catch (e) { }
+  recognitionRef.current = null;
+}
+
+2. Store Reference (Navbar.jsx, line 228):
+The recognition instance is stored in a ref:
+
+recognitionRef.current = recognition;
+
+3. Stop Immediately After Result (Navbar.jsx, lines 236-240):
+After processing the result, recognition is stopped immediately:
+
+try { recognition.stop(); } catch (e) { }
+recognitionRef.current = null;
+setIsListening(false);
+setVoiceMode(null);
+
+4. Separate Refs for Different Modes (Navbar.jsx, lines 28-29):
+Two separate refs are used for different recognition modes:
+
+const recognitionRef = useRef(null);      // Command recognition
+const queryRecRef = useRef(null);         // Query/search recognition
+
+File: UserInterface/src/components/Navbar.jsx
+Lines: 27-29, 216-219, 236-240, 360-361
+
+
+QUESTION 3: How is 95 percent recognition accuracy achieved?
+
+ANSWER:
+
+Accuracy improvements come from:
+
+1. Language Configuration (Navbar.jsx, line 222):
+The recognition is configured for US English:
+
+recognition.lang = 'en-US';
+
+2. Command Normalization (Navbar.jsx, line 233):
+All commands are converted to lowercase for consistent matching:
+
+const transcript = transcriptRaw.toLowerCase();
+
+3. Flexible Pattern Matching - Multiple variations accepted:
+The system accepts various command formats:
+
+const playMatch = transcript.match(/(?:play|open|watch|index|play number|play the)?\s*(\d{1,4})\b/);
+
+4. Error Handling (Navbar.jsx, lines 352-354):
+Errors are logged for debugging:
+
+recognition.onerror = (ev) => {
+  console.error('recognition error', ev);
+};
+
+5. User Feedback (Navbar.jsx, line 349):
+Users receive immediate feedback on what was heard:
+
+setStatusMessage(`Heard: "${transcriptRaw}"`);
+
+File: UserInterface/src/components/Navbar.jsx
+Lines: 222, 233, 251-271, 352-354
+
+
+QUESTION 4: Explain the voice search implementation
+
+ANSWER:
+
+Voice search uses a separate recognition instance specifically for query input.
+
+Control Flow:
+
+1. Trigger Search Recognition (Navbar.jsx, lines 323-327):
+When user says "search", query recognition is triggered:
+
+if (transcript.includes('search')) {
+  setStatusMessage("Record your search query");
+  setMobileSearchOpen(true);
+  startQueryRecognition();
+  return;
+}
+
+2. Query Recognition Setup (Navbar.jsx, lines 364-401):
+A dedicated recognition instance is created for search:
+
+const startQueryRecognition = () => {
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'en-US';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript.trim();
+    setSearchText(transcript);
+    navigate(`/search/${encodeURIComponent(transcript)}`);
+    setMobileSearchOpen(false);
+  };
+  
+  recognition.start();
+};
+
+Differences from Command Recognition:
+- Purpose: Query recognition captures search terms; command recognition executes actions
+- Navigation: Query recognition navigates to search results page
+- UI: Opens mobile search input and focuses it
+
+File: UserInterface/src/components/Navbar.jsx
+Lines: 323-327, 364-401
+
+
+QUESTION 5: How is the voice message recorder implemented?
+
+ANSWER:
+
+Voice message recorder converts speech to text and posts as comment.
+
+Step-by-Step Control Flow:
+
+1. Recorder Initialization (Video.jsx, lines 392-398):
+The recorder checks for browser support:
+
+const startMessageRecorder = () => {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    setStatusMessage("Speech Recognition not supported in this browser.");
+    return;
+  }
+
+2. 10-Second Timeout Setup (Video.jsx, lines 439-445):
+A timeout ensures recording stops after 10 seconds:
+
+setTimeout(() => {
+  try { recognition.start(); } catch (e) { }
+}, 120);
+
+setTimeout(() => {
+  try { recognition.stop(); } catch (e) { }
+}, 10000); // 10 seconds
+
+3. Speech-to-Text Conversion (Video.jsx, lines 410-427):
+The recognition result is converted to text:
+
+recognition.onresult = async (event) => {
+  let spokenText = "";
+  for (let i = event.resultIndex; i < event.results.length; ++i) {
+    if (event.results[i].isFinal) {
+      spokenText += event.results[i][0].transcript;
+    }
+  }
+  const collected = spokenText.trim();
+  if (collected) {
+    await handleSendMessage(collected, { openModal: true });
+    setStatusMessage("Message sent!");
+  }
+};
+
+4. Post Message (Video.jsx, lines 315-353):
+The converted text is posted as a comment:
+
+const handleSendMessage = async (overrideText = null, { openModal = false } = {}) => {
+  const messageText = overrideText !== null ? overrideText : newMessage;
+  const res = await axios.post(`/api/v1/messages`, 
+    { videoId: id, content: messageText }, 
+    { withCredentials: true }
+  );
+};
+
+File: UserInterface/src/components/Video.jsx
+Lines: 392-446, 315-353
+
+
+SECTION 2: VOICE COMMAND PARSING AND INTENT RECOGNITION
+
+QUESTION 6: Explain the command parsing logic in handleVoiceCommand
+
+ANSWER:
+
+The handleVoiceCommand function uses pattern matching and string includes checks to parse commands.
+
+Control Flow:
+
+1. Normalize Input (Video.jsx, lines 523-528):
+All commands are converted to lowercase:
+
+const handleVoiceCommand = async (command) => {
+  const video = videoRef.current;
+  if (!video) return;
+  const lower = String(command).toLowerCase();
+  setDetected(lower);
+
+2. Index Parsing First (Video.jsx, lines 531-547):
+Index-based commands are parsed first:
+
+const idx = parseIndexFromText(lower, recommended.length);
+if (idx !== null) {
+  const target = recommended[idx];
+  navigate(`/watch/${target._id}`);
+  return;
+}
+
+3. Command Pattern Matching - Examples:
+   - Download (Video.jsx, lines 556-559):
+if (lower.includes("download") || lower.includes("download video")) {
+  await downloadVideo();
+  return;
+}
+
+   - Volume Control (Video.jsx, lines 566-569):
+if (lower.includes("volume increase") || lower.includes("increase volume")) {
+  video.muted = false;
+  video.volume = Math.min(video.volume + 0.1, 1);
+  return;
+}
+
+4. Fallback for Unrecognized (Video.jsx, lines 669-670):
+Unrecognized commands show an error message:
+
+setStatusMessage("Please speak clearly. Command not recognized.");
+setTimeout(() => setStatusMessage(""), 3000);
+
+File: UserInterface/src/components/Video.jsx
+Lines: 523-671
+
+
+QUESTION 7: How does parseIndexFromText work?
+
+ANSWER:
+
+parseIndexFromText converts numeric words and digits to array indices.
+
+Step-by-Step:
+
+1. Digit Matching (Video.jsx, lines 94-98):
+Digits are extracted and converted to zero-based indices:
+
+const digitMatch = text.match(/\b(\d+)(st|nd|rd|th)?\b/);
+if (digitMatch) {
+  const n = Number(digitMatch[1]);
+  if (n >= 1 && n <= max) return n - 1; // Convert to 0-based index
+}
+
+2. Word Number Mapping (Video.jsx, lines 99-105):
+Word numbers are mapped to indices:
+
+const wordMatch = text.match(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|first|second|third|fourth|fifth)\b/);
+if (wordMatch) {
+  const map = { zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, 
+                six: 6, seven: 7, eight: 8, nine: 9, ten: 10, 
+                first: 1, second: 2, third: 3, fourth: 4, fifth: 5 };
+  const n = map[wordMatch[1]] ?? null;
+  if (n !== null && n >= 0 && n < max) return n === 0 ? 0 : n - 1;
+}
+
+3. Number Word Conversion Helper (Video.jsx, lines 54-79):
+A helper function converts word numbers to integers:
+
+const WORD_NUMBER_MAP = {
+  zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5,
+  // ... up to hundred: 100
+};
+
+const wordsToNumber = (text) => {
+  const words = text.toLowerCase().replace(/[,()-]/g, ' ').split(/\s+/);
+  let total = 0, current = 0;
+  for (let w of words) {
+    if (WORD_NUMBER_MAP[w] != null) {
+      const val = WORD_NUMBER_MAP[w];
+      if (val === 100) {
+        if (current === 0) current = 1;
+        current = current * 100;
+      } else {
+        current += val;
+      }
+    }
+  }
+  return total > 0 ? total : null;
+};
+
+File: UserInterface/src/components/Video.jsx
+Lines: 54-106
+
+
+QUESTION 8: How are ambiguous commands handled?
+
+ANSWER:
+
+Ambiguous commands are handled through priority order and fallback behavior.
+
+Control Flow:
+
+1. Priority Order (Video.jsx, lines 531-671):
+   - Index parsing (highest priority)
+   - Specific commands (download, render)
+   - Playback controls
+   - Generic "play" (lowest priority)
+
+2. Generic "play" Command (Video.jsx, line 648):
+If no specific command matches, generic play is executed:
+
+if (lower.includes("play")) { 
+  video.play().catch(() => { }); 
+  return; 
+}
+
+3. Index Parsing Takes Precedence (Video.jsx, lines 531-547):
+Index parsing happens first and prevents generic play:
+
+const idx = parseIndexFromText(lower, recommended.length);
+if (idx !== null) {
+  // Navigate to specific video
+  navigate(`/watch/${target._id}`);
+  return; // Early return prevents "play" from executing
+}
+
+4. Error Feedback (Video.jsx, lines 669-670):
+Unrecognized commands show feedback:
+
+setStatusMessage("Please speak clearly. Command not recognized.");
+
+File: UserInterface/src/components/Video.jsx
+Lines: 531-671
+
+
+QUESTION 9: Explain the extractSeconds function
+
+ANSWER:
+
+extractSeconds parses time values from natural language commands.
+
+Step-by-Step:
+
+1. Digit Pattern Matching (Video.jsx, lines 82-83):
+Digits followed by time units are extracted:
+
+const digitMatch = text.match(/(\d+)\s*(?:sec|second|seconds|s)\b/i);
+if (digitMatch) return parseInt(digitMatch[1], 10);
+
+2. Word Number Matching (Video.jsx, lines 84-88):
+Word numbers are converted to seconds:
+
+const wordMatch = text.match(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred)(?:\s+(?:and\s+)?[a-z\s-]*)?\b/i);
+if (wordMatch) {
+  const possible = wordMatch[0];
+  return wordsToNumber(possible);
+}
+
+3. Usage in Forward/Rewind (Video.jsx, lines 578-597):
+The function is used for seeking:
+
+if (lower.includes("forward") || lower.includes("skip forward")) {
+  const sec = extractSeconds(lower) ?? (() => {
+    const m = lower.match(/forward\s+([a-z0-9\s-]+)\s*(?:seconds?|secs?)?/);
+    if (m && m[1]) return wordsToNumber(m[1].trim());
+    return null;
+  })();
+  const jump = sec ?? 10; // Default to 10 seconds
+  video.currentTime = Math.min((video.currentTime || 0) + jump, video.duration || Infinity);
+  return;
+}
+
+File: UserInterface/src/components/Video.jsx
+Lines: 80-90, 578-597
+
+
+QUESTION 10: How are voice commands for scrolling implemented?
+
+ANSWER:
+
+Scrolling uses requestAnimationFrame for smooth animation with speed control.
+
+Control Flow:
+
+1. Scroll State Management (Navbar.jsx, lines 32-41):
+Scroll state is managed in a ref:
+
+const scrollRef = useRef({
+  running: false,
+  direction: 1,
+  speed: 240,
+  rafId: null,
+  lastTime: null,
+  timeoutId: null,
+  manualInterrupted: false,
+  reachedEnd: false,
+});
+
+2. Animation Loop (Navbar.jsx, lines 54-89):
+A smooth animation loop handles scrolling:
+
+const scrollStep = (time) => {
+  const s = scrollRef.current;
+  if (!s.running) { s.rafId = null; return; }
+  if (s.lastTime == null) s.lastTime = time;
+  const dt = (time - s.lastTime) / 1000;
+  s.lastTime = time;
+  const delta = s.speed * dt * s.direction;
+  window.scrollBy({ top: delta, left: 0, behavior: 'auto' });
+  
+  // Check boundaries
+  const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+  const viewport = window.innerHeight || 0;
+  const docHeight = Math.max(document.documentElement.scrollHeight || 0, document.body.scrollHeight || 0);
+  
+  if (s.direction === 1 && scrollTop + viewport >= docHeight - 1) {
+    stopScroll();
+    return;
+  }
+  
+  s.rafId = requestAnimationFrame(scrollStep);
+};
+
+3. Manual Interrupt Detection (Navbar.jsx, lines 118-143):
+User input interrupts voice scrolling:
+
+useEffect(() => {
+  const onUserInput = (e) => {
+    const s = scrollRef.current;
+    if (!s.running) return;
+    s.manualInterrupted = true;
+    try { stopScroll(); } catch (err) { }
+    setStatusMessage('Manual scroll detected — voice scroll stopped');
+  };
+  
+  window.addEventListener('wheel', onUserInput, { passive: true });
+  window.addEventListener('touchstart', onUserInput, { passive: true });
+  window.addEventListener('keydown', onKey, { passive: true });
+  
+  return () => {
+    window.removeEventListener('wheel', onUserInput);
+    // ... cleanup
+  };
+}, []);
+
+4. Speed Control (Navbar.jsx, lines 108-116):
+Speed can be adjusted dynamically:
+
+const changeSpeedByFactor = (factor) => {
+  scrollRef.current.speed = Math.max(20, Math.round(scrollRef.current.speed * factor));
+  setStatusMessage(`Scroll speed ${scrollRef.current.speed} px/s`);
+};
+
+File: UserInterface/src/components/Navbar.jsx
+Lines: 32-143
+
+
+SECTION 3: VIDEO PLAYER CONTROLS AND PLAYBACK
+
+QUESTION 11: How is Picture-in-Picture (PiP) mode implemented?
+
+ANSWER:
+
+PiP uses the browser's native Picture-in-Picture API with error handling.
+
+Control Flow:
+
+1. PiP Toggle Command (Video.jsx, lines 607-614):
+The command toggles PiP mode:
+
+if (lower.includes("picture in picture") || lower.includes("pip")) {
+  try {
+    if (document.pictureInPictureElement) {
+      await document.exitPictureInPicture();
+    } else if (video.requestPictureInPicture) {
+      await video.requestPictureInPicture();
+    } else {
+      setStatusMessage("Picture-in-Picture not supported");
+      setTimeout(() => setStatusMessage(""), 2500);
+    }
+  } catch (err) {
+    console.error("PIP error:", err);
+    setStatusMessage("PIP blocked or unavailable");
+    setTimeout(() => setStatusMessage(""), 3000);
+  }
+  return;
+}
+
+2. Browser Compatibility:
+   - Chrome/Edge: Full support
+   - Firefox: Full support
+   - Safari: Full support
+   - Older browsers: Graceful fallback with error message
+
+File: UserInterface/src/components/Video.jsx
+Lines: 607-614
+
+
+QUESTION 12: Explain the autoplay implementation with muted fallback
+
+ANSWER:
+
+Autoplay handles browser autoplay policies by trying unmuted first, then falling back to muted.
+
+Step-by-Step:
+
+1. Video Ready Check (Video.jsx, lines 141-160):
+The system waits for video to be ready:
+
+useEffect(() => {
+  if (!videoData?.videoFile || !videoRef.current) return;
+  const v = videoRef.current;
+  
+  const attemptAutoplay = () => {
+    try { v.pause(); } catch (e) {}
+    if (v.src !== videoData.videoFile) v.src = videoData.videoFile;
+    
+    if (v.readyState >= 2) { // HAVE_CURRENT_DATA or higher
+      tryAutoplay();
+    } else {
+      const onCanPlay = () => {
+        v.removeEventListener('canplay', onCanPlay);
+        tryAutoplay();
+      };
+      v.addEventListener('canplay', onCanPlay);
+    }
+  };
+
+2. Try Unmuted First (Video.jsx, lines 162-191):
+Unmuted autoplay is attempted first:
+
+const tryAutoplay = () => {
+  try {
+    v.muted = false;
+    setIsMutedState(false);
+    v.play().then(() => {
+      // Success - unmuted autoplay
+      setShowUnmuteBtn(false);
+      setVideoLoading(false);
+    }).catch(() => {
+      // Failed - try muted
+      try {
+        v.muted = true;
+        setIsMutedState(true);
+        return v.play().then(() => {
+          // Muted autoplay succeeded
+          setShowUnmuteBtn(true);
+          setVideoLoading(false);
+        });
+      } catch (mutedErr) {
+        // Both failed
+        setShowUnmuteBtn(true);
+        setVideoLoading(false);
+      }
+    });
+  } catch (e) {
+    setShowUnmuteBtn(true);
+    setVideoLoading(false);
+  }
+};
+
+3. Unmute Button (Video.jsx, lines 750-760):
+An unmute button appears when muted autoplay succeeds:
+
+{showUnmuteBtn && (
+  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+    <button
+      onClick={handleUnmuteClick}
+      className="pointer-events-auto bg-black bg-opacity-60 text-white px-4 py-2 rounded-md"
+    >
+      Unmute
+    </button>
+  </div>
+)}
+
+File: UserInterface/src/components/Video.jsx
+Lines: 141-212, 750-760
+
+
+QUESTION 13: How are playback speed controls implemented?
+
+ANSWER:
+
+Playback speed uses the HTML5 video playbackRate property.
+
+Implementation:
+
+1. Speed Commands (Video.jsx, lines 571-576):
+Commands map to specific playback rates:
+
+if (lower.includes("normal")) { video.playbackRate = 1; return; }
+if (lower.includes("slow")) { video.playbackRate = 0.5; return; }
+if (lower.includes("slower")) { video.playbackRate = Math.max(video.playbackRate - 0.25, 0.25); return; }
+if (lower.includes("faster")) { video.playbackRate = Math.min(video.playbackRate + 0.25, 3); return; }
+if (lower.includes("double")) { video.playbackRate = 2; return; }
+if (lower.includes("triple")) { video.playbackRate = 3; return; }
+
+2. Rate Mapping:
+   - "normal" maps to 1.0x
+   - "slow" maps to 0.5x
+   - "slower" decreases current rate by 0.25 (minimum 0.25)
+   - "faster" increases current rate by 0.25 (maximum 3.0)
+   - "double" maps to 2.0x
+   - "triple" maps to 3.0x
+
+File: UserInterface/src/components/Video.jsx
+Lines: 571-576
+
+
+QUESTION 14: How is video seeking implemented via voice commands?
+
+ANSWER:
+
+Seeking calculates new currentTime based on extracted seconds.
+
+Control Flow:
+
+1. Forward Seek (Video.jsx, lines 578-587):
+Forward seeking adds seconds to current time:
+
+if (lower.includes("forward") || lower.includes("skip forward")) {
+  const sec = extractSeconds(lower) ?? (() => {
+    const m = lower.match(/forward\s+([a-z0-9\s-]+)\s*(?:seconds?|secs?)?/);
+    if (m && m[1]) return wordsToNumber(m[1].trim());
+    return null;
+  })();
+  const jump = sec ?? 10; // Default 10 seconds
+  video.currentTime = Math.min((video.currentTime || 0) + jump, video.duration || Infinity);
+  return;
+}
+
+2. Backward Seek (Video.jsx, lines 588-597):
+Backward seeking subtracts seconds from current time:
+
+if (lower.includes("backward") || lower.includes("skip back") || lower.includes("rewind")) {
+  const sec = extractSeconds(lower) ?? (() => {
+    const m = lower.match(/backward\s+([a-z0-9\s-]+)\s*(?:seconds?|secs?)?/);
+    if (m && m[1]) return wordsToNumber(m[1].trim());
+    return null;
+  })();
+  const jump = sec ?? 10; // Default 10 seconds
+  video.currentTime = Math.max((video.currentTime || 0) - jump, 0);
+  return;
+}
+
+3. Boundary Protection:
+   - Forward: Math.min prevents exceeding video duration
+   - Backward: Math.max prevents negative time
+
+File: UserInterface/src/components/Video.jsx
+Lines: 578-597
+
+
+QUESTION 15: How does video playback by index work?
+
+ANSWER:
+
+Index-based playback navigates to recommended videos using parsed indices.
+
+Complete Flow:
+
+1. Voice Command Parsed (Navbar.jsx, lines 251-271):
+The command is parsed to extract index:
+
+const playMatch = transcript.match(/(?:play|open|watch|index|play number|play the)?\s*(\d{1,4})\b/);
+if (playMatch) {
+  const idx = parseInt(playMatch[1], 10);
+  if (!isNaN(idx) && idx > 0) {
+    window.dispatchEvent(new CustomEvent('play-index', { detail: { index: idx } }));
+    setStatusMessage(`Playing video #${idx}`);
+    return;
+  }
+}
+
+2. Event Listener in Video Component (Video.jsx, lines 680-694):
+The component listens for play-index events:
+
+const onPlayIndex = (e) => {
+  const idx = e?.detail?.index ?? e?.detail;
+  if (!idx) return;
+  const zeroBased = Number(idx) - 1;
+  if (Number.isInteger(zeroBased) && zeroBased >= 0 && zeroBased < recommended.length) {
+    const target = recommended[zeroBased];
+    if (target) {
+      setStatusMessage(`Opening "${target.title}"`);
+      navigate(`/watch/${target._id}`);
+    }
+  } else {
+    setStatusMessage("Index out of range");
+    setTimeout(() => setStatusMessage(""), 2000);
+  }
+};
+
+window.addEventListener('play-index', onPlayIndex);
+
+3. Recommended Videos Fetch (Video.jsx, lines 236-240):
+Recommended videos are fetched on component mount:
+
+useEffect(() => {
+  axios.get("/api/v1/videos/allVideo")
+    .then(res => setRecommended(res.data.data || []))
+    .catch(console.error);
+}, []);
+
+File: UserInterface/src/components/Navbar.jsx (lines 251-271)
+File: UserInterface/src/components/Video.jsx (lines 236-240, 680-694)
+
+
+SECTION 4: BACKEND ARCHITECTURE AND API DESIGN
+
+QUESTION 16: Explain the RESTful API structure
+
+ANSWER:
+
+The API follows REST principles with route-based organization and middleware.
+
+Structure:
+
+1. Main App Setup (src/app.js, lines 1-100):
+Express app is configured with middleware:
+
+import express from "express"
+import cors from "cors"
+import cookieParser from "cookie-parser"
+
+const app = express()
+
+app.use(cookieParser())
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  methods: ["GET","POST","PUT","DELETE"],
+  credentials: true,
+}));
+
+app.use(express.json({limit: "700mb"}))
+app.use(express.urlencoded({extended: true, limit: "700mb"}))
+
+2. Route Organization (src/app.js, lines 44-74):
+Routes are organized by resource:
+
+import userAccount from './routes/account.routes.js'
+import videoRouter from "./routes/video.routes.js"
+import messageRouter from "./routes/message.routes.js";
+import likeRouter from "./routes/like.routes.js";
+import subscribeRouter from "./routes/subscribe.route.js";
+
+app.use("/api/v1/account", userAccount)
+app.use("/api/v1/videos", videoRouter)
+app.use("/api/v1/messages", messageRouter)
+app.use("/api/v1/likes", likeRouter)
+app.use("/api/v1/subs", subscribeRouter)
+
+3. Middleware Application:
+   - Global: CORS, cookie parser, body parser (src/app.js)
+   - Route-level: JWT verification (src/routes/video.routes.js, line 16):
+router.use(verifyJWT); // Apply to all routes in this file
+
+File: src/app.js
+Lines: 1-100
+
+
+QUESTION 17: How is the video upload flow implemented?
+
+ANSWER:
+
+Upload flow: Multer to Cloudinary to Database.
+
+Step-by-Step:
+
+1. Multer Configuration (src/middlewares/multer.middleware.js):
+Files are temporarily stored on disk:
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, tempDir); // Saves to /public/temp
+  },
+  filename: function (req, file, cb) {
+    cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname))
+  }
+});
+
+export const upload = multer({  
+  storage: storage,
+  limits: { fileSize: 600 * 1024 * 1024 } // 600MB limit
+});
+
+2. Route Handler (src/routes/video.routes.js, lines 10-19):
+Multer middleware processes uploads:
+
+const videoUpload = upload.fields([
+  { name:'thumbnail', maxCount: 1 },
+  { name:'videoFile', maxCount: 1 },
+]);
+
+router.route("/publish").post(videoUpload, publishAVideo)
+
+3. Controller Processing (src/controllers/video.controller.js, lines 14-46):
+Files are uploaded to Cloudinary and saved to database:
+
+const publishAVideo = asyncHandler(async (req, res) => {
+  const { title, description } = req.body;
+  const thumbnailFile = req.files?.thumbnail?.[0];
+  const videoFile = req.files?.videoFile?.[0];
+
+  if (!title || !description || !thumbnailFile || !videoFile) {
+    throw new ApiError(400, "All fields are required");
+  }
+
+  const thumbnailFilePath = await uploadOnCloudinary(thumbnailFile.path);
+  const videoFilePath = await uploadOnCloudinary(videoFile.path);
+
+  if (!thumbnailFilePath || !videoFilePath) {
+    throw new ApiError(400, "File upload problem");
+  }
+
+  const video = await Video.create({
+    title,
+    description,
+    thumbnail: thumbnailFilePath.url,
+    videoFile: videoFilePath.url,
+    owner: req.user._id,
+    views: 0
+  });
+
+  return res.status(201).json(new ApiResponse(201, video, "Video published successfully"));
+});
+
+4. Cloudinary Upload (src/utils/cloudinary.js, lines 13-45):
+Files are uploaded to Cloudinary and local files deleted:
+
+const uploadOnCloudinary = async (localFilePath) => {
+  try {
+    if (!localFilePath) {
+      throw new Error("Local file path is required");
+    }
+
+    const response = await cloudinary.uploader.upload(localFilePath, {
+      resource_type: "auto",
+      media_metadata: true
+    });
+
+    fs.unlinkSync(localFilePath); // Remove local file after upload
+    
+    return response;
+  } catch (error) {
+    if (fs.existsSync(localFilePath)) {
+      fs.unlinkSync(localFilePath);
+    }
+    return { error: error.message };
+  }
+};
+
+Files: 
+- src/middlewares/multer.middleware.js
+- src/routes/video.routes.js (lines 10-19)
+- src/controllers/video.controller.js (lines 14-46)
+- src/utils/cloudinary.js (lines 13-45)
+
+
+QUESTION 18: Explain the JWT authentication system
+
+ANSWER:
+
+JWT uses access tokens (short-lived) and refresh tokens (long-lived) stored in HTTP-only cookies.
+
+Control Flow:
+
+1. Token Generation (src/models/account.model.js, lines 50-74):
+Tokens are generated using user methods:
+
+userSignUp.methods.generateAccessToken = function(){
+  return jwt.sign(
+    {
+      _id: this._id,
+      email: this.email,
+      name: this.name
+    },
+    process.env.ACCESS_TOKEN_SECRET,
+    {
+      expiresIn: process.env.ACCESS_TOKEN_EXPIRY // Typically 15m
+    }
+  )
+}
+
+userSignUp.methods.generateRefreshToken = function(){
+  return jwt.sign(
+    {
+      _id: this._id,
+    },
+    process.env.REFRESH_TOKEN_SECRET,
+    {
+      expiresIn: process.env.REFRESH_TOKEN_EXPIRY // Typically 7d
+    }
+  )
+}
+
+2. Login Flow (src/controllers/account.controller.js, lines 121-169):
+Tokens are generated and stored in cookies:
+
+const login = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  const userfind = await newUser.findOne({ email });
+  
+  if (!userfind) {
+    throw new ApiError(404, "User does not exist");
+  }
+
+  const isPasswordValid = await userfind.isPasswordCorrect(password);
+  if (!isPasswordValid) {
+    throw new ApiError(400, "Invalid password");
+  }
+
+  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(userfind._id);
+  
+  const loggedInUser = await newUser.findById(userfind._id).select("-refreshToken");
+
+  const isProd = process.env.NODE_ENV === "production";
+  const options = {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/"
+  };
+
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(new ApiResponse(200, { user: loggedInUser, accessToken, refreshToken }, "User logged in successfully"));
+});
+
+3. Token Verification Middleware (src/middlewares/auth.middleware.js, lines 10-42):
+Tokens are verified on protected routes:
+
+export const verifyJWT = asyncHandler(async (req, _, next) => {
+  try {
+    const token = req.cookies?.accessToken || 
+                  req.header("Authorization")?.replace("Bearer ", "");
+    
+    if (!token) {
+      throw new ApiError(401, "Unauthorized request");
+    }
+
+    const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    
+    const user = await newUser
+      .findById(decodedToken?._id)
+      .select("-password -refreshToken");
+
+    if (!user) {
+      throw new ApiError(401, "Invalid Access Token");
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    throw new ApiError(401, error?.message || "Invalid access token");
+  }
+});
+
+4. Refresh Token Flow (src/controllers/account.controller.js, lines 197-253):
+Refresh tokens generate new access tokens:
+
+const refreshAccessToken = asyncHandler(async(req, res) => {
+  try {
+    const incomingRefreshToken = req.cookies?.refreshToken || req.body.refreshToken;
+    
+    if (!incomingRefreshToken) {
+      throw new ApiError(401, "Unauthorized request - no refresh token provided");
+    }
+
+    const decodedToken = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET);
+    const user = await newUser.findById(decodedToken?._id);
+    
+    if (!user) {
+      throw new ApiError(401, "Invalid Token");
+    }
+    
+    if (incomingRefreshToken !== user?.refreshToken) {
+      throw new ApiError(401, "Refresh token is expired or used");
+    }
+    
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
+    
+    const options = {
+      httpOnly: true,
+      secure: true
+    };
+    
+    return res
+      .status(200)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", refreshToken, options)
+      .json(new ApiResponse(200, { accessToken, refreshToken }, "Refresh token generated"));
+  } catch (error) {
+    throw new ApiError(401, "Invalid refresh token");
+  }
+});
+
+Token Expiry Strategy:
+- Access Token: 15 minutes (from environment variable)
+- Refresh Token: 7 days (from environment variable)
+- Storage: HTTP-only cookies (prevents XSS)
+- Refresh: When access token expires, use refresh token to get new tokens
+
+Files:
+- src/models/account.model.js (lines 50-74)
+- src/controllers/account.controller.js (lines 121-169, 197-253)
+- src/middlewares/auth.middleware.js (lines 10-42)
+
+
+QUESTION 19: How is the like/unlike functionality implemented?
+
+ANSWER:
+
+Like/unlike uses a toggle pattern with a separate Like model for tracking.
+
+Control Flow:
+
+1. Like Model Schema (src/models/like.model.js):
+Likes are stored in a separate collection:
+
+const likeSchema = new Schema({
+  targetType: { type: String, enum: ["Video", "Message"], required: true },
+  target: { type: Schema.Types.ObjectId, required: true, index: true, refPath: "targetType" },
+  likedBy: { type: Schema.Types.ObjectId, ref: "newUser", required: true }
+}, { timestamps: true });
+
+likeSchema.index({ targetType: 1, target: 1, likedBy: 1 }, { unique: true });
+
+2. Toggle Like Controller (src/controllers/video.controller.js, lines 173-204):
+Likes are toggled by creating or deleting:
+
+export const toggleLikeVideo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const video = await Video.findById(id);
+    if (!video) return res.status(404).json({ error: "Video not found" });
+
+    // Check if already liked
+    const existing = await Like.findOne({
+      targetType: "Video",
+      target: id,
+      likedBy: userId,
+    });
+
+    if (existing) {
+      await existing.deleteOne(); // Unlike
+    } else {
+      await Like.create({ // Like
+        targetType: "Video",
+        target: id,
+        likedBy: userId,
+      });
+    }
+
+    const totalLikes = await Like.countDocuments({ targetType: "Video", target: id });
+
+    return res.json({ likes: totalLikes });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+3. Frontend Like Handler (Video.jsx, lines 243-271):
+Frontend handles optimistic updates:
+
+const handleLikeVideo = async () => {
+  if (isLiking) return null;
+  setIsLiking(true);
+  const prevLiked = videoLiked;
+  const prevCount = videoLikes;
+  
+  try {
+    const res = await axios.put(`/api/v1/videos/${id}/like`, {}, { withCredentials: true });
+    if (res?.data) {
+      if (typeof res.data.liked !== 'undefined') setVideoLiked(!!res.data.liked);
+      else setVideoLiked(!prevLiked);
+      if (typeof res.data.likes === 'number') setVideoLikes(res.data.likes);
+      else setVideoLikes(prev => (prevLiked ? Math.max(0, prev - 1) : prev + 1));
+      return { liked: !prevLiked, likes: res.data.likes };
+    }
+  } catch (err) {
+    setVideoLiked(prevLiked);
+    setVideoLikes(prevCount);
+    if (err.response?.status === 401) navigate('/login');
+    return null;
+  } finally {
+    setIsLiking(false);
+  }
+};
+
+Efficiency:
+- Unique index prevents duplicate likes
+- countDocuments efficiently counts likes
+- Optimistic UI updates with rollback on error
+
+Files:
+- src/models/like.model.js
+- src/controllers/video.controller.js (lines 173-204)
+- UserInterface/src/components/Video.jsx (lines 243-271)
+
+
+QUESTION 20: Explain the subscription system
+
+ANSWER:
+
+Subscriptions use a many-to-many relationship between users.
+
+Control Flow:
+
+1. Subscription Model (src/models/subscription.model.js):
+Subscriptions link subscribers to channels:
+
+const subscriptionSchema = new mongoose.Schema({
+  subscriber: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  channel: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+}, { timestamps: true });
+
+subscriptionSchema.index({ subscriber: 1, channel: 1 }, { unique: true });
+
+2. Toggle Subscribe (src/routes/subscribe.route.js, lines 8-29):
+Subscriptions are toggled by creating or deleting:
+
+router.post("/:channelId/subscribe", verifyJWT, async (req, res) => {
+  try {
+    const { channelId } = req.params;
+    const userId = req.user.id;
+
+    if (channelId === userId) {
+      return res.status(400).json({ msg: "You cannot subscribe to yourself" });
+    }
+
+    const existing = await Subscription.findOne({ subscriber: userId, channel: channelId });
+
+    if (existing) {
+      await Subscription.findByIdAndDelete(existing._id);
+      return res.json({ msg: "Unsubscribed successfully", subscribed: false });
+    } else {
+      const subscription = await Subscription.create({ subscriber: userId, channel: channelId });
+      return res.status(201).json({ msg: "Subscribed successfully", subscribed: true, subscription });
+    }
+  } catch (err) {
+    res.status(500).json({ msg: "Server error" });
+  }
+});
+
+3. Get Subscription Status (src/routes/subscribe.route.js, lines 59-65):
+Status is checked efficiently:
+
+router.get("/:channelId/status", verifyJWT, async (req, res) => {
+  const { channelId } = req.params;
+  const userId = req.user.id;
+
+  const subscribed = await Subscription.exists({ subscriber: userId, channel: channelId });
+  res.json({ subscribed: !!subscribed });
+});
+
+4. Get Subscription Count (src/routes/subscribe.route.js, lines 67-72):
+Count is calculated on demand:
+
+router.get("/:channelId/count", async (req, res) => {
+  const { channelId } = req.params;
+  const count = await Subscription.countDocuments({ channel: channelId });
+  res.json({ count });
+});
+
+5. Frontend Subscription Handler (Video.jsx, lines 287-311):
+Frontend handles optimistic updates:
+
+const handleSubscribe = async () => {
+  if (!channelId) return;
+  if (isToggling) return;
+  
+  const prevSubscribed = subscribe;
+  const prevCount = count;
+  const newSubscribed = !prevSubscribed;
+  
+  setIsToggling(true);
+  setSubscribe(newSubscribed);
+  setCount(prev => Math.max(0, prev + (newSubscribed ? 1 : -1)));
+  
+  try {
+    const res = await axios.post(`/api/v1/subs/${channelId}/subscribe`, {}, { withCredentials: true });
+    if (res.data?.subscribed !== undefined) setSubscribe(!!res.data.subscribed);
+    if (typeof res.data?.count === 'number') setCount(res.data.count);
+  } catch (err) {
+    setSubscribe(prevSubscribed);
+    setCount(prevCount);
+    if (err.response?.status === 401) navigate('/login');
+  } finally {
+    setIsToggling(false);
+  }
+};
+
+Real-time Updates:
+- Optimistic UI updates
+- Server response confirms actual state
+- Count fetched separately for performance
+
+Files:
+- src/models/subscription.model.js
+- src/routes/subscribe.route.js (lines 8-72)
+- UserInterface/src/components/Video.jsx (lines 287-311)
+
+
+SECTION 5: DATABASE AND DATA MODELING
+
+QUESTION 21: Explain the Video model schema
+
+ANSWER:
+
+The Video schema stores video metadata with references to the owner.
+
+Schema Definition (src/models/video.model.js):
+Videos are stored with all necessary metadata:
+
+const videoSchema = new Schema({
+  videoFile: { type: String, required: true },
+  thumbnail: { type: String, required: true },
+  title: { type: String, required: true },
+  description: { type: String, required: true },
+  duration: { type: Number, default: 0 },
+  views: { type: Number, default: 0 },
+  owner: {
+    type: Schema.Types.ObjectId,
+    ref: "newUser",
+    required: true
+  }
+}, { timestamps: true });
+
+videoSchema.methods.incrementViews = async function () {
+  this.views++;
+  await this.save();
+};
+
+videoSchema.plugin(mongooseAggregatePaginate);
+
+Indexing:
+- owner field is indexed (implicitly via ref)
+- mongoose-aggregate-paginate-v2 plugin enables pagination on aggregate queries
+
+File: src/models/video.model.js
+
+
+QUESTION 22: How is the Like model designed with refPath?
+
+ANSWER:
+
+refPath enables dynamic references based on targetType.
+
+Schema (src/models/like.model.js):
+The schema uses refPath for polymorphic relationships:
+
+const likeSchema = new Schema({
+  targetType: { type: String, enum: ["Video", "Message"], required: true },
+  target: { type: Schema.Types.ObjectId, required: true, index: true, refPath: "targetType" },
+  likedBy: { type: Schema.Types.ObjectId, ref: "newUser", required: true }
+}, { timestamps: true });
+
+likeSchema.index({ targetType: 1, target: 1, likedBy: 1 }, { unique: true });
+
+How refPath Works:
+- When targetType = "Video", target references the Video model
+- When targetType = "Message", target references the Message model
+- Enables polymorphic relationships
+
+Usage Example (src/controllers/message.controller.js, lines 47-68):
+Likes work for both videos and messages:
+
+export const toggleLikeOnMessage = async (req, res) => {
+  const existing = await Like.findOne({ 
+    targetType: "Message", 
+    target: id, 
+    likedBy: req.user._id 
+  });
+  
+  if (existing) {
+    await existing.deleteOne();
+  } else {
+    await Like.create({ 
+      targetType: "Message", 
+      target: id, 
+      likedBy: req.user._id 
+    });
+  }
+};
+
+File: src/models/like.model.js
+
+
+QUESTION 23: How is the watch history feature implemented?
+
+ANSWER:
+
+Watch history stores video IDs in the user's watchHistory array.
+
+Control Flow:
+
+1. Add to History (Video.jsx, lines 125-128):
+Videos are added to history when watched:
+
+useEffect(() => {
+  axios.put(`/api/v1/videos/incrementView/${id}`).catch(console.error);
+  axios.put(`/api/v1/account/addToHistory/${id}`).catch(console.error);
+}, [id]);
+
+2. User Model Schema (src/models/account.model.js, lines 28-33):
+History is stored as an array of video references:
+
+watchHistory: [{
+  type: Schema.Types.ObjectId,
+  ref: "video"
+}]
+
+3. Get Watch History (src/controllers/account.controller.js, lines 328-350):
+History is retrieved using aggregation:
+
+const GetWatchHistory = asyncHandler(async (req, res) => {
+  const user = await newUser.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user._id)
+      }
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory"
+      }
+    },
+    {
+      $project: {
+        watchHistory: 1
+      }
+    }
+  ]);
+  
+  return res.status(200).json(new ApiResponse(200, user[0].watchHistory, "Watch history fetched"));
+});
+
+File: src/models/account.model.js (lines 28-33)
+File: src/controllers/account.controller.js (lines 328-350)
+
+
+QUESTION 24: Explain relationships between User, Video, and Message models
+
+ANSWER:
+
+Models use Mongoose references and population for efficient queries.
+
+Relationships:
+
+1. User to Video (One-to-Many):
+   - Video.owner references User (src/models/video.model.js, lines 31-35)
+   - Population: Video.find().populate('owner', 'name avatar')
+
+2. User to Message (One-to-Many):
+   - Message.author references User (src/models/message.model.js, line 5)
+   - Population: Message.find().populate('author', 'name avatar')
+
+3. Video to Message (One-to-Many):
+   - Message.video references Video (src/models/message.model.js, line 4)
+   - Query: Message.find({ video: videoId }).populate('author')
+
+4. Optimization Example (src/controllers/video.controller.js, lines 50-56):
+Only needed fields are populated:
+
+const getAllVideos = asyncHandler(async (req, res) => {
+  const videos = await Video.find()
+    .populate('owner', 'name avatar') // Only fetch needed fields
+    .lean(); // Returns plain objects (faster)
+  
+  return res.status(200).json(new ApiResponse(200, videos, "Videos fetched successfully"));
+});
+
+Files:
+- src/models/video.model.js
+- src/models/message.model.js
+- src/models/account.model.js
+
+
+QUESTION 25: How is view counting implemented?
+
+ANSWER:
+
+View counting uses an instance method to increment views atomically.
+
+Implementation:
+
+1. Schema Method (src/models/video.model.js, lines 44-48):
+Views are incremented using an instance method:
+
+videoSchema.methods.incrementViews = async function () {
+  this.views++;
+  await this.save();
+};
+
+2. Controller (src/controllers/video.controller.js, lines 116-130):
+The method is called from the controller:
+
+const viewsIncrement = asyncHandler(async(req, res) => {
+  const { id } = req.params;
+  const video = await Video.findById(id);
+  
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  await video.incrementViews();
+
+  return res.status(200).json(new ApiResponse(200, video, "Video Views Updated"));
+});
+
+3. Frontend Call (Video.jsx, lines 125-128):
+Views are incremented when video loads:
+
+useEffect(() => {
+  axios.put(`/api/v1/videos/incrementView/${id}`).catch(console.error);
+  axios.put(`/api/v1/account/addToHistory/${id}`).catch(console.error);
+}, [id]);
+
+Race Condition Prevention:
+- Mongoose save() uses atomic operations
+- For high concurrency, consider findByIdAndUpdate with $inc:
+await Video.findByIdAndUpdate(id, { $inc: { views: 1 } });
+
+File: src/models/video.model.js (lines 44-48)
+File: src/controllers/video.controller.js (lines 116-130)
+
+
+SECTION 6: FRONTEND ARCHITECTURE AND STATE MANAGEMENT
+
+QUESTION 26: Explain the Redux state management implementation
+
+ANSWER:
+
+Redux Toolkit with redux-persist manages authentication state.
+
+Setup:
+
+1. Store Configuration (UserInterface/src/store/store.js):
+Store is configured with persistence:
+
+import { configureStore } from "@reduxjs/toolkit";
+import authReducer from "./slice/authSlice";
+import storage from "redux-persist/lib/storage";
+import { persistReducer, persistStore } from "redux-persist";
+import { combineReducers } from "redux";
+
+const persistConfig = {
+  key: "root",
+  storage,
+};
+
+const rootReducer = combineReducers({
+  auth: authReducer,
+});
+
+const persistedReducer = persistReducer(persistConfig, rootReducer);
+
+export const store = configureStore({
+  reducer: persistedReducer,
+});
+
+export const persistor = persistStore(store);
+
+2. Auth Slice (UserInterface/src/store/slice/authSlice.js, lines 53-105):
+Auth state is managed in a slice:
+
+const authSlice = createSlice({
+  name: 'auth',
+  initialState: {
+    user: null,
+    loading: false,
+    error: null,
+    accessToken: null,
+    refreshToken: null,
+    status: false,
+  },
+  reducers: {
+    setUser: (state, action) => {
+      state.user = action.payload;
+      state.status = true;
+    }
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(login.fulfilled, (state, action) => {
+        state.loading = false;
+        state.status = true;
+        state.user = action.payload.user;
+        state.accessToken = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
+      })
+      .addCase(login.rejected, (state, action) => {
+        state.loading = false;
+        state.status = false;
+        state.error = action.payload;
+      });
+  },
+});
+
+3. Persistence Benefits:
+   - State survives page refresh
+   - User remains logged in across sessions
+   - Stored in localStorage
+
+File: UserInterface/src/store/store.js
+File: UserInterface/src/store/slice/authSlice.js
+
+
+QUESTION 27: How is routing structured?
+
+ANSWER:
+
+React Router with protected routes using AuthLayout.
+
+Structure:
+
+1. Routing Setup (UserInterface/src/routes/Routing.jsx):
+Routes are organized with protection:
+
+<BrowserRouter>
+  <Routes>
+    <Route path="/" element={<App />}>
+      <Route index element={<Navigate to="/login" replace />} />
+      
+      <Route
+        path="home"
+        element={
+          <AuthLayout>
+            <Home />
+          </AuthLayout>
+        }
+      />
+      
+      <Route
+        path="watch/:id"
+        element={
+          <AuthLayout>
+            <Video />
+          </AuthLayout>
+        }
+      />
+    </Route>
+    
+    <Route path="/login" element={<Login />} />
+    <Route path="/signup" element={<Signup />} />
+  </Routes>
+</BrowserRouter>
+
+2. AuthLayout Component (UserInterface/src/components/AuthLayout.jsx):
+AuthLayout protects routes:
+
+function AuthLayout({ children }) {
+  const authStatus = useSelector((state) => state.auth.status);
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (authStatus === false) {
+      navigate("/");
+    }
+  }, [authStatus, navigate]);
+
+  return (
+    <>
+      {authStatus === true ? children : null}
+    </>
+  );
+}
+
+Protected Route Pattern:
+- Wraps protected components with AuthLayout
+- Checks auth.status from Redux
+- Redirects to login if not authenticated
+- Public routes (login/signup) outside AuthLayout
+
+Files:
+- UserInterface/src/routes/Routing.jsx
+- UserInterface/src/components/AuthLayout.jsx
+
+
+QUESTION 28: How are Custom Events used for communication?
+
+ANSWER:
+
+Custom Events enable decoupled communication between Navbar and Video components.
+
+Implementation:
+
+1. Event Dispatch (Navbar.jsx, lines 255, 268, 348):
+Events are dispatched from Navbar:
+
+window.dispatchEvent(new CustomEvent('play-index', { detail: { index: idx } }));
+
+window.dispatchEvent(new CustomEvent('voice-command', { detail: transcript }));
+
+window.dispatchEvent(new CustomEvent('create-message', { detail: { source: 'navbar' } }));
+
+2. Event Listeners (Video.jsx, lines 674-709):
+Video component listens for events:
+
+useEffect(() => {
+  const onVoiceCommand = (e) => {
+    const payload = e?.detail ?? e;
+    const text = typeof payload === 'string' ? payload : (payload.text || payload.transcript || payload);
+    handleVoiceCommand(text);
+  };
+  
+  const onPlayIndex = (e) => {
+    const idx = e?.detail?.index ?? e?.detail;
+    if (!idx) return;
+    const zeroBased = Number(idx) - 1;
+    if (Number.isInteger(zeroBased) && zeroBased >= 0 && zeroBased < recommended.length) {
+      const target = recommended[zeroBased];
+      if (target) {
+        navigate(`/watch/${target._id}`);
+      }
+    }
+  };
+  
+  const onCreateMessage = (e) => {
+    startMessageRecorder();
+  };
+
+  window.addEventListener('voice-command', onVoiceCommand);
+  window.addEventListener('play-index', onPlayIndex);
+  window.addEventListener('create-message', onCreateMessage);
+
+  return () => {
+    window.removeEventListener('voice-command', onVoiceCommand);
+    window.removeEventListener('play-index', onPlayIndex);
+    window.removeEventListener('create-message', onCreateMessage);
+  };
+}, [recommended, channelId, subscribe, count]);
+
+Benefits:
+- Decoupled components
+- Global event bus
+- Easy to add new listeners
+
+Files:
+- UserInterface/src/components/Navbar.jsx (lines 255, 268, 348)
+- UserInterface/src/components/Video.jsx (lines 674-709)
+
+
+QUESTION 29: Explain the axios interceptor setup
+
+ANSWER:
+
+Axios is configured globally with credentials and base URL.
+
+Setup (UserInterface/src/api/axios.js):
+Global configuration is set:
+
+import axios from "axios";
+
+axios.defaults.withCredentials = true; // Send cookies with requests
+axios.defaults.baseURL = import.meta.env.VITE_API_URL; // Centralized base URL
+
+export default axios;
+
+Usage (UserInterface/src/components/Video.jsx, line 112):
+Requests automatically include credentials:
+
+const res = await axios.get(`/api/v1/videos/videoData/${id}`, { withCredentials: true });
+
+Benefits:
+- Automatic cookie inclusion
+- Centralized base URL
+- Consistent configuration
+
+File: UserInterface/src/api/axios.js
+
+
+QUESTION 30: How is responsive design implemented?
+
+ANSWER:
+
+Tailwind CSS with responsive breakpoints and conditional rendering.
+
+Examples:
+
+1. Sidebar Responsiveness (App.jsx, lines 15-23):
+Sidebar adapts to screen size:
+
+useEffect(() => {
+  const handleResize = () => {
+    setIsOpen(window.innerWidth >= 768);
+  };
+  window.addEventListener('resize', handleResize);
+  handleResize();
+  return () => window.removeEventListener('resize', handleResize);
+}, []);
+
+2. Layout Classes (App.jsx, lines 51-54):
+Layout adjusts based on sidebar state:
+
+<div className={`relative w-full h-full overflow-y-auto bg-gray-50 ${isOpen ? "lg:ml-52" : "md:mx-16"}`}>
+
+3. Mobile Search (Navbar.jsx, lines 510-538):
+Mobile-specific UI is conditionally rendered:
+
+{mobileSearchOpen && (
+  <div className="fixed inset-x-0 top-0 z-40 p-3 bg-white shadow-md sm:hidden">
+    {/* Mobile search UI */}
+  </div>
+)}
+
+4. Video Title Truncation (Video.jsx, lines 765-773):
+Titles are truncated on mobile:
+
+<h1 className="mt-4 mb-3 text-xl font-semibold md:hidden">
+  {videoData?.title
+    ? (videoData.title.length > 50 ? videoData.title.slice(0, 70) + '...' : videoData.title)
+    : ''}
+</h1>
+
+Voice Commands on Mobile:
+- Same Web Speech API works on mobile browsers
+- Touch events interrupt voice scrolling (Navbar.jsx, line 133)
+- Mobile search modal for better UX
+
+Files:
+- UserInterface/src/App.jsx (lines 15-23, 51-54)
+- UserInterface/src/components/Navbar.jsx (lines 510-538)
+- UserInterface/src/components/Video.jsx (lines 765-773)
+
+
+SECTION 7: BONUS TECHNICAL DEEP-DIVE QUESTIONS
+
+QUESTION 31: How would you optimize voice recognition latency?
+
+ANSWER:
+
+Optimization Strategies:
+
+1. Pre-initialize Recognition:
+Recognition instances can be pre-created to avoid setup delay:
+
+const recognitionRef = useRef(null);
+
+useEffect(() => {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SpeechRecognition) {
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.lang = 'en-US';
+    recognitionRef.current.interimResults = false;
+    recognitionRef.current.maxAlternatives = 1;
+    // Pre-configure to avoid setup delay
+  }
+}, []);
+
+2. Use Interim Results for Faster Feedback:
+Interim results provide immediate feedback:
+
+recognition.interimResults = true;
+recognition.onresult = (event) => {
+  const interim = event.results[event.resultIndex];
+  if (interim.isFinal) {
+    // Process final result
+  } else {
+    // Show interim feedback immediately
+    setStatusMessage(`Listening: ${interim[0].transcript}`);
+  }
+};
+
+3. Debounce Recognition Start:
+Prevent multiple rapid starts:
+
+const debouncedStart = useMemo(
+  () => debounce(() => recognitionRef.current?.start(), 100),
+  []
+);
+
+4. Web Workers for Processing:
+Move command parsing to Web Worker:
+
+const worker = new Worker('commandParser.worker.js');
+worker.postMessage({ transcript });
+worker.onmessage = (e) => {
+  handleVoiceCommand(e.data.command);
+};
+
+
+QUESTION 32: How would you implement voice command history?
+
+ANSWER:
+
+Implementation:
+
+1. Command History State:
+Track commands in state:
+
+const [commandHistory, setCommandHistory] = useState([]);
+const [historyIndex, setHistoryIndex] = useState(-1);
+
+const addToHistory = (command) => {
+  setCommandHistory(prev => [...prev, {
+    command,
+    timestamp: Date.now(),
+    success: true
+  }]);
+  setHistoryIndex(-1);
+};
+
+2. Undo Functionality:
+Reverse actions based on command type:
+
+const undoLastCommand = () => {
+  if (commandHistory.length === 0) return;
+  
+  const lastCommand = commandHistory[commandHistory.length - 1];
+  
+  // Reverse action based on command type
+  if (lastCommand.command.includes('play')) {
+    videoRef.current?.pause();
+  } else if (lastCommand.command.includes('volume increase')) {
+    videoRef.current.volume = Math.max(0, videoRef.current.volume - 0.1);
+  }
+  // ... other reversals
+  
+  setCommandHistory(prev => prev.slice(0, -1));
+};
+
+3. Voice Command for History:
+Add undo command:
+
+if (lower.includes("undo") || lower.includes("go back")) {
+  undoLastCommand();
+  return;
+}
+
+
+QUESTION 33: How would you scale to support multiple languages?
+
+ANSWER:
+
+Multi-language Support:
+
+1. Language Detection:
+Detect and configure language:
+
+const LANGUAGE_CONFIG = {
+  'en-US': { commands: englishCommands, recognition: 'en-US' },
+  'es-ES': { commands: spanishCommands, recognition: 'es-ES' },
+  'fr-FR': { commands: frenchCommands, recognition: 'fr-FR' },
+};
+
+const detectLanguage = (transcript) => {
+  // Use language detection library or API
+  return detectedLang || 'en-US';
+};
+
+const startCommandRecognition = (lang = 'en-US') => {
+  const recognition = new SpeechRecognition();
+  recognition.lang = LANGUAGE_CONFIG[lang].recognition;
+  // ...
+};
+
+2. Command Translation Map:
+Map commands to actions in each language:
+
+const COMMAND_TRANSLATIONS = {
+  'en-US': {
+    'play': ['play', 'start', 'begin'],
+    'pause': ['pause', 'stop'],
+  },
+  'es-ES': {
+    'play': ['reproducir', 'jugar', 'iniciar'],
+    'pause': ['pausar', 'detener'],
+  },
+};
+
+3. User Preference:
+Store and use user language preference:
+
+const [userLanguage, setUserLanguage] = useState(
+  localStorage.getItem('preferredLanguage') || 'en-US'
+);
+
+useEffect(() => {
+  startCommandRecognition(userLanguage);
+}, [userLanguage]);
+
+
+QUESTION 34: How would you implement analytics for voice commands?
+
+ANSWER:
+
+Analytics Implementation:
+
+1. Command Tracking:
+Track each command execution:
+
+const trackCommand = async (command, success, executionTime) => {
+  await axios.post('/api/v1/analytics/voice-command', {
+    command,
+    success,
+    executionTime,
+    timestamp: Date.now(),
+    userId: user?._id,
+    videoId: id,
+  });
+};
+
+const handleVoiceCommand = async (command) => {
+  const startTime = performance.now();
+  try {
+    // Execute command
+    await executeCommand(command);
+    const executionTime = performance.now() - startTime;
+    trackCommand(command, true, executionTime);
+  } catch (error) {
+    trackCommand(command, false, performance.now() - startTime);
+  }
+};
+
+2. Backend Analytics Endpoint:
+Store analytics data:
+
+router.post('/voice-command', async (req, res) => {
+  const { command, success, executionTime, userId, videoId } = req.body;
+  
+  await Analytics.create({
+    type: 'voice_command',
+    command,
+    success,
+    executionTime,
+    userId,
+    videoId,
+    timestamp: new Date(),
+  });
+  
+  res.json({ success: true });
+});
+
+3. Dashboard Query:
+Aggregate statistics:
+
+const getCommandStats = async (req, res) => {
+  const stats = await Analytics.aggregate([
+    { $match: { type: 'voice_command' } },
+    { $group: {
+      _id: '$command',
+      count: { $sum: 1 },
+      avgExecutionTime: { $avg: '$executionTime' },
+      successRate: { $avg: { $cond: ['$success', 1, 0] } }
+    }},
+    { $sort: { count: -1 } }
+  ]);
+  
+  res.json({ stats });
+};
+
+
+QUESTION 35: How would you add voice-based video editing?
+
+ANSWER:
+
+Video Editing Implementation:
+
+1. Trim Command Parser:
+Parse trim commands:
+
+const parseTrimCommand = (command) => {
+  // "trim from 10 seconds to 30 seconds"
+  const match = command.match(/trim\s+from\s+(\d+)\s+seconds?\s+to\s+(\d+)\s+seconds?/i);
+  if (match) {
+    return {
+      start: parseInt(match[1]),
+      end: parseInt(match[2])
+    };
+  }
+  return null;
+};
+
+2. Frontend Trim Handler:
+Handle trim requests:
+
+const handleTrim = async (start, end) => {
+  const video = videoRef.current;
+  if (!video) return;
+  
+  // Create trimmed video blob
+  const trimmedBlob = await trimVideoBlob(video, start, end);
+  
+  // Upload to server for processing
+  const formData = new FormData();
+  formData.append('trimmedVideo', trimmedBlob);
+  formData.append('originalVideoId', id);
+  formData.append('start', start);
+  formData.append('end', end);
+  
+  const res = await axios.post('/api/v1/videos/trim', formData, {
+    withCredentials: true,
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  
+  navigate(`/watch/${res.data.videoId}`);
+};
+
+3. Backend Processing:
+Process trim on server:
+
+router.post('/trim', upload.single('trimmedVideo'), async (req, res) => {
+  const { originalVideoId, start, end } = req.body;
+  
+  // Use ffmpeg to trim video
+  const trimmedPath = await trimVideoWithFFmpeg(
+    originalVideoId,
+    start,
+    end
+  );
+  
+  const trimmedUrl = await uploadOnCloudinary(trimmedPath);
+  
+  const video = await Video.create({
+    title: `Trimmed: ${originalVideo.title}`,
+    videoFile: trimmedUrl.url,
+    owner: req.user._id,
+    // ...
+  });
+  
+  res.json({ videoId: video._id });
+});
+
+4. FFmpeg Integration:
+Use FFmpeg for video processing:
+
+const trimVideoWithFFmpeg = async (videoId, start, end) => {
+  const video = await Video.findById(videoId);
+  const outputPath = `public/temp/trimmed-${Date.now()}.mp4`;
+  
+  await new Promise((resolve, reject) => {
+    ffmpeg(video.videoFile)
+      .setStartTime(start)
+      .setDuration(end - start)
+      .output(outputPath)
+      .on('end', resolve)
+      .on('error', reject)
+      .run();
+  });
+  
+  return outputPath;
+};
+
+
+CONCLUSION
+
+These answers cover the implementation details, control flows, and code examples for all 35 interview questions. Each answer includes:
+- Step-by-step explanations
+- Code snippets with file names and line numbers
+- Control flow descriptions
+- Best practices and optimizations
+
+The platform demonstrates advanced voice control, robust backend architecture, efficient database design, and modern frontend patterns.
+```
+
+Rewritten without special symbols. The document uses plain text formatting with clear section headers, indentation, and line breaks. All code examples are preserved, and file references and line numbers are included.
