@@ -6,8 +6,9 @@
 //write code to implement the likes pages for production
 // src/pages/Like.jsx
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import axios from "../api/axios";
+import { useSelector } from "react-redux";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
@@ -177,6 +178,7 @@ function VideoCard({ item, onUnlike, index }) {
    --------------------------- */
 export default function Like() {
   const navigate = useNavigate();
+  const authStatus = useSelector((state) => state.auth.status);
 
   const [videos, setVideos] = useState([]);
   const [total, setTotal] = useState(0);
@@ -266,6 +268,44 @@ export default function Like() {
     // include videos and navigate in deps so handler uses fresh list
   }, [videos, navigate]);
 
+  const handleUnlike = useCallback(async (videoId) => {
+    // optimistic UI removal
+    const previous = videos;
+    setVideos(prev => prev.filter(it => it.video._id !== videoId));
+    setTotal(prevTotal => Math.max(0, prevTotal - 1));
+    setError(null);
+
+    try {
+      const url = buildUrl(`/api/v1/likes/video/${videoId}`);
+      const res = await axios.post(url, {}, {
+        headers: getAuthHeader(),
+        withCredentials: true,
+      });
+
+      if (res.status === 401) {
+        // rollback
+        setVideos(previous);
+        setTotal(previous.length);
+        setError("Please sign in to continue.");
+        setTimeout(() => setError(null), 3000);
+        return;
+      }
+
+      if (!(res.status >= 200 && res.status < 300)) {
+        throw new Error(`Failed to unlike: ${res.status}`);
+      }
+
+      // success — keep it removed
+      // optional: show quick success message
+    } catch (err) {
+      console.error("Unlike failed:", err);
+      setVideos(previous);
+      setTotal(previous.length);
+      setError("Failed to unlike video. Please try again.");
+      setTimeout(() => setError(null), 2500);
+    }
+  }, [videos]);
+
   // When videos load, process any pending play/unlike requests.
   useEffect(() => {
     if (pendingIndexRef.current && videos.length > 0) {
@@ -286,15 +326,9 @@ export default function Like() {
         alert(`No liked video found at index ${idx}`);
       }
     }
-  }, [videos, navigate]);
+  }, [videos, navigate, handleUnlike]);
 
-  const handleAuthFailure = (message) => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("jwt");
-    setError(message || "Please login to continue.");
-    setTimeout(() => navigate("/login", { replace: true }), 600);
-  };
+  // Removed handleAuthFailure - no redirects, just show empty state
 
   const ALL_LIMIT = 100000;
 
@@ -305,6 +339,14 @@ export default function Like() {
   };
 
   const fetchAllLiked = useCallback(async () => {
+    // Only fetch if user is logged in
+    if (!authStatus) {
+      setLoading(false);
+      setVideos([]);
+      setTotal(0);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -315,11 +357,6 @@ export default function Like() {
         withCredentials: true,
       });
 
-      if (res.status === 401) {
-        handleAuthFailure("You must be logged in to view liked videos.");
-        return;
-      }
-
       const data = res?.data?.data ?? res?.data ?? {};
       const list = data.videos || data || [];
       setVideos(Array.isArray(list) ? list : []);
@@ -327,55 +364,19 @@ export default function Like() {
     } catch (err) {
       console.error(err);
       if (err?.response?.status === 401) {
-        handleAuthFailure("You must be logged in to view liked videos.");
-        return;
+        setVideos([]);
+        setTotal(0);
+      } else {
+        setError(err.message || "Something went wrong");
       }
-      setError(err.message || "Something went wrong");
     } finally {
       setLoading(false);
     }
-  }, [API_BASE]);
+  }, [API_BASE, authStatus]);
 
   useEffect(() => {
     fetchAllLiked();
   }, [fetchAllLiked]);
-
-  const handleUnlike = useCallback(async (videoId) => {
-    // optimistic UI removal
-    const previous = videos;
-    setVideos(prev => prev.filter(it => it.video._id !== videoId));
-    setTotal(prevTotal => Math.max(0, prevTotal - 1));
-    setError(null);
-
-    try {
-      const url = buildUrl(`/api/v1/likes/video/${videoId}`);
-      const res = await axios.post(url, {}, {
-        headers: getAuthHeader(),
-        withCredentials: true,
-      });
-
-      if (res.status === 401) {
-        handleAuthFailure("You must be logged in to unlike videos.");
-        // rollback
-        setVideos(previous);
-        setTotal(previous.length);
-        return;
-      }
-
-      if (!(res.status >= 200 && res.status < 300)) {
-        throw new Error(`Failed to unlike: ${res.status}`);
-      }
-
-      // success — keep it removed
-      // optional: show quick success message
-    } catch (err) {
-      console.error("Unlike failed:", err);
-      setVideos(previous);
-      setTotal(previous.length);
-      setError("Failed to unlike video. Please try again.");
-      setTimeout(() => setError(null), 2500);
-    }
-  }, [videos]);
 
   return (
     <div className="lg:mt-8 bg-gray-50 min-h-screen p-6">
@@ -409,15 +410,45 @@ export default function Like() {
               <div key={i} className="animate-pulse bg-white rounded-2xl p-3 h-56" />
             ))}
           </div>
+        ) : !authStatus ? (
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="bg-white rounded-lg p-12 text-center shadow-sm max-w-md w-full">
+              <div className="mb-6">
+                <svg 
+                  className="w-20 h-20 mx-auto text-gray-400" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={1.5} 
+                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                  />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-semibold mb-4 text-gray-900">Sign in to save your favorite videos</h2>
+              <p className="text-gray-600 mb-2">Your liked videos will appear here after you sign in</p>
+              <div className="mt-8">
+                <Link 
+                  to="/login" 
+                  className="inline-block px-6 py-3 bg-red-600 text-white font-medium rounded-full hover:bg-red-700 transition-colors"
+                >
+                  Sign In
+                </Link>
+              </div>
+            </div>
+          </div>
         ) : videos.length === 0 ? (
           <div className="bg-white rounded p-6 text-center">
             <p className="text-gray-700">You haven't liked any videos yet.</p>
-            <a
-              href="/"
+            <Link
+              to="/home"
               className="mt-3 inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
             >
               Explore videos
-            </a>
+            </Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">

@@ -76,29 +76,20 @@ function Routing() {
                             />
                         </Route>
 
+                        {/* Public routes - content depends on auth state */}
                         <Route
                             path="history"
-                            element={
-                                <AuthLayout>
-                                    <History />
-                                </AuthLayout>
-                            }
-                        />
-                        <Route
-                            path="playlist"
-                            element={
-                                <AuthLayout>
-                                    <Playlist />
-                                </AuthLayout>
-                            }
+                            element={<History />}
                         />
                         <Route
                             path="like"
-                            element={
-                                <AuthLayout>
-                                    <Like />
-                                </AuthLayout>
-                            }
+                            element={<Like />}
+                        />
+
+                        {/* Public routes - content depends on auth state */}
+                        <Route
+                            path="playlist"
+                            element={<Playlist />}
                         />
                         <Route
                             path="subscriptions"
@@ -125,20 +116,18 @@ function Routing() {
                             element={<Shorts />}
                         />
 
+                        {/* Public routes - content depends on auth state */}
+                        <Route
+                            path="settings"
+                            element={<Settings />}
+                        />
+
                         {/* Protected routes - require authentication */}
                         <Route
                             path="customize_channel"
                             element={
                                 <AuthLayout>
                                     <CustomizeChannel />
-                                </AuthLayout>
-                            }
-                        />
-                        <Route
-                            path="settings"
-                            element={
-                                <AuthLayout>
-                                    <Settings />
                                 </AuthLayout>
                             }
                         />

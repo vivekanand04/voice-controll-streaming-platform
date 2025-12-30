@@ -10,6 +10,7 @@ import { Link } from "react-router-dom";
 import { useRef } from "react";
 const API_BASE = import.meta.env.VITE_API_URL;
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 
 
 
@@ -64,6 +65,7 @@ function SkeletonCard() {
 }
 
 export default function History() {
+  const authStatus = useSelector((state) => state.auth.status);
   const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -102,24 +104,35 @@ const pendingIndexRef = useRef(null);
 
 
   useEffect(() => {
+    // Only fetch history if user is logged in
+    if (!authStatus) {
+      setIsLoading(false);
+      setHistory([]);
+      return;
+    }
+
     const fetchHistory = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await axios.get(`${API_BASE}/api/v1/account/history`);
+        const response = await axios.get(`${API_BASE}/api/v1/account/history`, { withCredentials: true });
         // backend might return response.data.data or response.data
         const data = response?.data?.data ?? response?.data ?? [];
         setHistory(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error("Error fetching history:", err);
-        setError("Failed to load watch history.");
+        if (err.response?.status === 401) {
+          setHistory([]);
+        } else {
+          setError("Failed to load watch history.");
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchHistory();
-  }, []);
+  }, [authStatus]);
 
   return (
     <div className="lg:mt-12 bg-gray-50 min-h-screen p-6">
@@ -169,11 +182,41 @@ const pendingIndexRef = useRef(null);
               <SkeletonCard key={i} />
             ))}
           </div>
+        ) : !authStatus ? (
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="bg-white rounded-lg p-12 text-center shadow-sm max-w-md w-full">
+              <div className="mb-6">
+                <svg 
+                  className="w-20 h-20 mx-auto text-gray-400" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={1.5} 
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" 
+                  />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-semibold mb-4 text-gray-900">Sign in to access your watch history</h2>
+              <p className="text-gray-600 mb-2">Your watched history will appear here after you sign in</p>
+              <div className="mt-8">
+                <Link 
+                  to="/login" 
+                  className="inline-block px-6 py-3 bg-red-600 text-white font-medium rounded-full hover:bg-red-700 transition-colors"
+                >
+                  Sign In
+                </Link>
+              </div>
+            </div>
+          </div>
         ) : history.length === 0 ? (
           <div className="bg-white rounded-lg p-10 text-center shadow-sm">
             <h2 className="text-xl font-semibold mb-3 text-gray-800">No watch history yet</h2>
             <p className="text-gray-600 mb-6">Start watching videos and they'll appear here.</p>
-            <Link to="/" className="inline-block px-5 py-2 bg-indigo-600 text-white rounded">
+            <Link to="/home" className="inline-block px-5 py-2 bg-indigo-600 text-white rounded">
               Explore videos
             </Link>
           </div>
