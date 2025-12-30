@@ -13,15 +13,15 @@ const videoUpload = upload.fields([
     // { name: 'avatar', maxCount: 1 } // Add this if you are uploading avatar
   ]);
 
-  router.use(verifyJWT); // Apply verifyJWT middleware to all routes in this file
-
-
-router.route("/publish").post( videoUpload ,publishAVideo )
+// Public routes - no authentication required
 router.route("/allVideo").get(getAllVideos)
 router.route("/allUserVideo/:owner").get(getAllUserVideos)
-router.route("/delete/:id").delete(deleteVideoById)
 router.route("/videoData/:id").get(VideoDataById)
 router.route("/incrementView/:id").put(viewsIncrement)
-router.route("/:id/like").put(toggleLikeVideo);
+
+// Protected routes - require authentication
+router.route("/publish").post(verifyJWT, videoUpload, publishAVideo)
+router.route("/delete/:id").delete(verifyJWT, deleteVideoById)
+router.route("/:id/like").put(verifyJWT, toggleLikeVideo);
 
 export default router

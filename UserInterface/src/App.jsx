@@ -1,9 +1,9 @@
 
 
 import { Navbar, Sidebar } from "./components";
-import { Navigate, Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { useState, useEffect } from "react";
-// import axios from "axios";
+import axios from "axios";
 import "./api/axios"; 
 import { useDispatch } from "react-redux";
 import { setUser } from "./store/slice/authSlice"; // you need this action
@@ -23,7 +23,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    // Refresh token on app load
+    // Refresh token on app load - don't redirect on failure, just set user if successful
     const checkLogin = async () => {
       try {
         const res = await axios.post(
@@ -33,8 +33,8 @@ function App() {
         );
         dispatch(setUser(res.data.data.user));  
       } catch (err) {
+        // User is not logged in - this is fine, don't redirect
         console.log("No active login session");
-        Navigate("/login");
       }
     };
 

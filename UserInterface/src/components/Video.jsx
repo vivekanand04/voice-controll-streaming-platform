@@ -4,11 +4,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Link, useParams, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 
 function Video() {
   const API = import.meta.env.VITE_API_URL || "";
   const { id } = useParams();
   const navigate = useNavigate();
+  const authStatus = useSelector((state) => state.auth.status);
 
   const [videoData, setVideoData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -241,6 +243,11 @@ const handleUnmuteClick = async () => {
 
   // === Like video ===
   const handleLikeVideo = async () => {
+    if (!authStatus) {
+      setStatusMessage('Please sign in to continue.');
+      setTimeout(() => setStatusMessage(''), 3000);
+      return null;
+    }
     if (isLiking) return null;
     setIsLiking(true);
     const prevLiked = videoLiked;
@@ -262,7 +269,10 @@ const handleUnmuteClick = async () => {
     } catch (err) {
       setVideoLiked(prevLiked);
       setVideoLikes(prevCount);
-      if (err.response?.status === 401) navigate('/login');
+      if (err.response?.status === 401) {
+        setStatusMessage('Please sign in to continue.');
+        setTimeout(() => setStatusMessage(''), 3000);
+      }
       console.error("like error:", err?.response?.data || err?.message);
       return null;
     } finally {
@@ -285,6 +295,11 @@ const handleUnmuteClick = async () => {
   }, [channelId]);
 
   const handleSubscribe = async () => {
+    if (!authStatus) {
+      setStatusMessage('Please sign in to continue.');
+      setTimeout(() => setStatusMessage(''), 3000);
+      return;
+    }
     if (!channelId) {
       console.warn("No channelId available for subscribe");
       return;
@@ -304,7 +319,10 @@ const handleUnmuteClick = async () => {
       setSubscribe(prevSubscribed);
       setCount(prevCount);
       console.error("subscribe error:", err.response?.data || err?.message);
-      if (err.response?.status === 401) navigate('/login');
+      if (err.response?.status === 401) {
+        setStatusMessage('Please sign in to continue.');
+        setTimeout(() => setStatusMessage(''), 3000);
+      }
     } finally {
       setIsToggling(false);
     }
@@ -313,6 +331,11 @@ const handleUnmuteClick = async () => {
   // === Post comment ===
   // NOTE: default openModal=false so manual posts won't open the modal.
   const handleSendMessage = async (overrideText = null, { openModal = false } = {}) => {
+    if (!authStatus) {
+      setStatusMessage('Please sign in to continue.');
+      setTimeout(() => setStatusMessage(''), 3000);
+      return;
+    }
     const messageText = overrideText !== null ? overrideText : newMessage;
     if (!messageText || !messageText.trim()) return;
     setIsPosting(true);
@@ -341,8 +364,10 @@ const handleUnmuteClick = async () => {
         setShowCommentsModal(true);
       }
     } catch (err) {
-      if (err.response?.status === 401) navigate('/login');
-      else {
+      if (err.response?.status === 401) {
+        setStatusMessage('Please sign in to continue.');
+        setTimeout(() => setStatusMessage(''), 3000);
+      } else {
         console.error('post message error:', err?.response?.data || err?.message);
         setStatusMessage('Failed to post message');
         setTimeout(() => setStatusMessage(''), 2000);
@@ -354,11 +379,19 @@ const handleUnmuteClick = async () => {
 
   // === Like comment ===
   const toggleMessageLike = async (msgId) => {
+    if (!authStatus) {
+      setStatusMessage('Please sign in to continue.');
+      setTimeout(() => setStatusMessage(''), 3000);
+      return;
+    }
     try {
       const res = await axios.post(`/api/v1/messages/${msgId}/like`, {}, { withCredentials: true });
       setMessages(prev => prev.map(m => m._id === msgId ? { ...m, likes: res.data.likes } : m));
     } catch (err) {
-      if (err.response?.status === 401) navigate('/login');
+      if (err.response?.status === 401) {
+        setStatusMessage('Please sign in to continue.');
+        setTimeout(() => setStatusMessage(''), 3000);
+      }
     }
   };
 
@@ -505,7 +538,8 @@ const handleUnmuteClick = async () => {
     } catch (err) {
       console.error('render error:', err);
       if (err.response?.status === 401) {
-        navigate('/login');
+        setStatusMessage('Please sign in to continue.');
+        setTimeout(() => setStatusMessage(''), 3000);
         return;
       }
       // If server doesn't implement that endpoint, fallback to a render page
@@ -614,6 +648,11 @@ const handleUnmuteClick = async () => {
     }
 
     if (lower.includes("toggle subscribe") || lower.includes("toggle subscription") || lower.includes("subscribe toggle")) {
+      if (!authStatus) {
+        setStatusMessage('Please sign in to continue.');
+        setTimeout(() => setStatusMessage(''), 3000);
+        return;
+      }
       if (!channelId) { setStatusMessage("Channel not ready yet"); setTimeout(() => setStatusMessage(""), 2500); return; }
       if (isToggling) { setStatusMessage("Please wait..."); setTimeout(() => setStatusMessage(""), 1800); return; }
       setIsToggling(true);
@@ -626,9 +665,13 @@ const handleUnmuteClick = async () => {
         setTimeout(() => setStatusMessage(""), 2000);
       } catch (err) {
         console.error("subscribe error:", err?.response?.data || err?.message);
-        setStatusMessage("Subscribe failed");
-        setTimeout(() => setStatusMessage(""), 2000);
-        if (err.response?.status === 401) navigate('/login');
+        if (err.response?.status === 401) {
+          setStatusMessage('Please sign in to continue.');
+          setTimeout(() => setStatusMessage(''), 3000);
+        } else {
+          setStatusMessage("Subscribe failed");
+          setTimeout(() => setStatusMessage(""), 2000);
+        }
       } finally {
         setIsToggling(false);
       }

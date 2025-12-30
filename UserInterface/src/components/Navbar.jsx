@@ -222,6 +222,7 @@ function Navbar({ openChange }) {
     recognition.lang = 'en-US';
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
+
     recognition.onstart = () => {
       setIsListening(true);
       setVoiceMode('command');
@@ -357,6 +358,7 @@ function Navbar({ openChange }) {
       setVoiceMode(null);
       recognitionRef.current = null;
     };
+    
     recognitionRef.current = recognition;
     try { recognition.start(); } catch (e) { console.error('start failed', e); }
   };
@@ -482,27 +484,37 @@ function Navbar({ openChange }) {
               <FiUpload />
             </Link>
 
-            {authStatus && (
-              <div className="relative hidden sm:block">
-                <button type="button" className="flex text-sm rounded-full focus:ring-4 focus:ring-gray-300" onClick={toggleDropdown} aria-haspopup="true" aria-expanded={dropdownVisible}>
-                  {userdata ? <img className="w-8 h-8 rounded-full" src={userdata.avatar} alt="User" /> : <div className="w-8 h-8 bg-gray-300 rounded-full animate-pulse" />}
-                </button>
+            <div className="relative hidden sm:block">
+              {authStatus ? (
+                <>
+                  <button type="button" className="flex text-sm rounded-full focus:ring-4 focus:ring-gray-300" onClick={toggleDropdown} aria-haspopup="true" aria-expanded={dropdownVisible}>
+                    {userdata ? <img className="w-8 h-8 rounded-full" src={userdata.avatar} alt="User" /> : <div className="w-8 h-8 bg-gray-300 rounded-full animate-pulse" />}
+                  </button>
 
-                {dropdownVisible && (
-                  <div className="absolute right-0 mt-2 w-48 text-base bg-white divide-y divide-gray-100 rounded shadow-lg">
-                    <div className="px-4 py-3">
-                      <p className="text-sm">{userdata?.name}</p>
-                      <p className="text-sm font-medium text-gray-900 truncate">{userdata?.email}</p>
+                  {dropdownVisible && (
+                    <div className="absolute right-0 mt-2 w-48 text-base bg-white divide-y divide-gray-100 rounded shadow-lg">
+                      <div className="px-4 py-3">
+                        <p className="text-sm">{userdata?.name}</p>
+                        <p className="text-sm font-medium text-gray-900 truncate">{userdata?.email}</p>
+                      </div>
+                      <ul className="py-1">
+                        <li><Link to="/your_channel" className="block px-4 py-2 text-sm hover:bg-gray-100">Dashboard</Link></li>
+                        <li><Link to="/settings" className="block px-4 py-2 text-sm hover:bg-gray-100">Settings</Link></li>
+                        <li><button onClick={handleSignOut} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Sign out</button></li>
+                      </ul>
                     </div>
-                    <ul className="py-1">
-                      <li><Link to="/your_channel" className="block px-4 py-2 text-sm hover:bg-gray-100">Dashboard</Link></li>
-                      <li><Link to="/settings" className="block px-4 py-2 text-sm hover:bg-gray-100">Settings</Link></li>
-                      <li><button onClick={handleSignOut} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Sign out</button></li>
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                </>
+              ) : (
+                <Link
+                  to="/login"
+                  className="flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-full hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  onClick={() => setDropdownVisible(false)}
+                >
+                  Sign In
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </div>

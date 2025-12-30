@@ -38,30 +38,23 @@ function Routing() {
         <Provider store={store}>
             <BrowserRouter>
                 <Routes>
-                    {/* Keep your App layout at '/' but redirect index to /login */}
+                    {/* Keep your App layout at '/' but redirect index to /home */}
                     <Route
                         path="/"
                         element={<App />}
                     >
-                        {/* When user opens '/', redirect to /login */}
-                        <Route index element={<Navigate to="/login" replace />} />
+                        {/* When user opens '/', redirect to /home */}
+                        <Route index element={<Navigate to="/home" replace />} />
 
+                        {/* Public routes - accessible without authentication */}
                         <Route
                             path="home"
-                            element={
-                                <AuthLayout>
-                                    <Home />
-                                </AuthLayout>
-                            }
+                            element={<Home />}
                         />
 
                         <Route
                             path="search/:query"
-                            element={
-                                <AuthLayout>
-                                    <SearchResults />
-                                </AuthLayout>
-                            }
+                            element={<SearchResults />}
                         />
 
                         <Route
@@ -116,21 +109,23 @@ function Routing() {
                             }
                         />
                         <Route
-                            path="shorts"
-                            element={
-                                <AuthLayout>
-                                    <Shorts />
-                                </AuthLayout>
-                            }
+                            path="watch/:id"
+                            element={<Video />}
                         />
                         <Route
-                            path="watch/:id"
-                            element={
-                                <AuthLayout>
-                                    <Video />
-                                </AuthLayout>
-                            }
+                            path="channel/:id"
+                            element={<Channel />}
                         />
+                        <Route path="/trending" element={<Trending />} />
+                        <Route path="/music" element={<Music />} />
+                        <Route path="/movies" element={<Movies />} />
+                        <Route path="/docs" element={<VoiceCommandsDocs />} />
+                        <Route
+                            path="shorts"
+                            element={<Shorts />}
+                        />
+
+                        {/* Protected routes - require authentication */}
                         <Route
                             path="customize_channel"
                             element={
@@ -147,26 +142,6 @@ function Routing() {
                                 </AuthLayout>
                             }
                         />
-                        <Route
-                            path="channel/:id"
-                            element={
-                                <AuthLayout>
-                                    <Channel />
-                                </AuthLayout>
-                            }
-                        />
-                        <Route path="/trending" element={<AuthLayout>
-                            <Trending />
-                        </AuthLayout>} />
-                        <Route path="/music" element={<AuthLayout>
-                            <Music />
-                        </AuthLayout>} />
-                        <Route path="/movies" element={<AuthLayout>
-                            <Movies />
-                        </AuthLayout>} />
-                          <Route path="/docs" element={<AuthLayout>
-                            <VoiceCommandsDocs />
-                        </AuthLayout>} />
 
 
                     </Route>

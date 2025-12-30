@@ -1,6 +1,6 @@
 
 
-QUESTION 1: How is the Web Speech API implemented for voice recognition?
+QUESTION 1:1. How is the Web Speech API implemented for voice recognition? Explain the difference between `SpeechRecognition` and `webkitSpeechRecognition` and how browser compatibility is handled.
 
 ANSWER:
 
@@ -45,7 +45,7 @@ File: UserInterface/src/components/Navbar.jsx
 Lines: 207-362
 
 
-QUESTION 2: How do you prevent multiple recognition instances from conflicting?
+QUESTION 2: How do you prevent multiple recognition instances from conflicting when the user triggers voice commands from different components (Navbar vs Video component)?
 
 ANSWER:
 
@@ -87,7 +87,7 @@ File: UserInterface/src/components/Navbar.jsx
 Lines: 27-29, 216-219, 236-240, 360-361
 
 
-QUESTION 3: How is 95 percent recognition accuracy achieved?
+QUESTION 3: How is the 95% recognition accuracy achieved? What techniques are used to improve accuracy, and how do you handle recognition errors or ambiguous commands?
 
 ANSWER:
 
