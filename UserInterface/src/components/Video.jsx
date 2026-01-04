@@ -244,7 +244,7 @@ const handleUnmuteClick = async () => {
   // === Like video ===
   const handleLikeVideo = async () => {
     if (!authStatus) {
-      setStatusMessage('Please sign in to continue.');
+      setStatusMessage('Please sign in to like this video.');
       setTimeout(() => setStatusMessage(''), 3000);
       return null;
     }
@@ -270,7 +270,7 @@ const handleUnmuteClick = async () => {
       setVideoLiked(prevLiked);
       setVideoLikes(prevCount);
       if (err.response?.status === 401) {
-        setStatusMessage('Please sign in to continue.');
+        setStatusMessage('Please sign in to like this video.');
         setTimeout(() => setStatusMessage(''), 3000);
       }
       console.error("like error:", err?.response?.data || err?.message);
@@ -423,6 +423,11 @@ const handleUnmuteClick = async () => {
 
   // === Voice Message Recorder ===
   const startMessageRecorder = () => {
+    if (!authStatus) {
+      setStatusMessage('Please sign in to comment.');
+      setTimeout(() => setStatusMessage(''), 3000);
+      return;
+    }
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setStatusMessage("Speech Recognition not supported in this browser.");
@@ -682,9 +687,13 @@ const handleUnmuteClick = async () => {
       if (isLiking) { setStatusMessage("Please wait..."); setTimeout(() => setStatusMessage(""), 1500); return; }
       setStatusMessage("Toggling like...");
       const result = await handleLikeVideo();
-      if (!result) { setStatusMessage("Like failed"); setTimeout(() => setStatusMessage(""), 1500); return; }
-      setStatusMessage(result.liked ? "Liked 👍" : "Unliked");
-      setTimeout(() => setStatusMessage(""), 1800);
+      // Only show "Like failed" if user is authenticated (meaning it failed for a different reason)
+      // If not authenticated, handleLikeVideo already set the appropriate message
+      if (!result && authStatus) { setStatusMessage("Like failed"); setTimeout(() => setStatusMessage(""), 1500); return; }
+      if (result) {
+        setStatusMessage(result.liked ? "Liked 👍" : "Unliked");
+        setTimeout(() => setStatusMessage(""), 1800);
+      }
       return;
     }
 
