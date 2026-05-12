@@ -5,11 +5,10 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-   "start": "node src/index.js",
-  "backend:dev": "nodemon src/index.js",
-  "frontend": "cd UserInterface && npm run dev",
-  "dev": "concurrently \"npm run frontend\" \"npm run backend:dev\""
-
+    "start": "node src/index.js",
+    "backend:dev": "nodemon src/index.js",
+    "frontend": "cd UserInterface && npm run dev",
+    "dev": "concurrently \"npm run frontend\" \"npm run backend:dev\""
   },
   "keywords": [
     "javascript",
@@ -18,6 +17,7 @@
   "author": "varshit",
   "license": "ISC",
   "devDependencies": {
+    "baseline-browser-mapping": "^2.10.29",
     "nodemon": "^3.1.0"
   },
   "dependencies": {

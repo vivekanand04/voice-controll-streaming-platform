@@ -22,7 +22,7 @@ app.use(cors({
 }));
 // app.options("*", cors());
 
-console.log("the value of mogodb uri is",process.env.MONGODB_URI);
+// console.log("the value of mogodb uri is",process.env.MONGODB_URI);
 
 
 // app.use(bodyParser.json())

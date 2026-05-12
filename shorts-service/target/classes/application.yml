@@ -1,0 +1,19 @@
+server:
+  port: 8081
+
+spring:
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/shortsdb}
+
+app:
+  shorts:
+    max-duration-seconds: ${SHORTS_MAX_DURATION:60}
+  storage:
+    base-path: ${SHORTS_STORAGE_PATH:./shorts-storage}
+    base-url: ${SHORTS_PUBLIC_URL:http://localhost:8081/media}
+  cors:
+    allowed-origins: ${FRONTEND_URL:http://localhost:5173}
+
+jwt:
+  secret: ${JWT_SECRET:change-me}
