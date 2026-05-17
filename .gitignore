@@ -149,3 +149,16 @@ dist
 interviewAnswer.txt
 interviewQuestions.txt
 *.interview*
+
+
+
+**/application.yml
+**/application-*.yml
+
+
+application.yml
+application-*.yml
+
+# Other sensitive files
+secrets.yml
+config/secrets/
