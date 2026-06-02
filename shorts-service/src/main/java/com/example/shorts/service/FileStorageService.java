@@ -1,5 +1,8 @@
 package com.example.shorts.service;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -9,6 +12,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -20,19 +24,46 @@ public class FileStorageService {
     @Value("${app.storage.base-url}")
     private String storageBaseUrl;
 
+    @Value("${app.cloudinary.enabled:false}")
+    private boolean cloudinaryEnabled;
+
+    @Autowired(required = false)
+    private Cloudinary cloudinary;
+
     public String saveVideo(MultipartFile file) throws IOException {
         validateVideoType(file);
-        Path folder = ensureDirectory("shorts");
-        String fileName = generateFileName(file.getOriginalFilename());
-        Files.copy(file.getInputStream(), folder.resolve(fileName));
-        return storageBaseUrl + "/shorts/" + fileName;
+        if (cloudinaryEnabled && cloudinary != null) {
+            return uploadToCloudinary(file, "video", "shorts");
+        }
+        return uploadToLocalStorage(file, "shorts");
     }
 
     public String saveThumbnail(MultipartFile file) throws IOException {
-        Path folder = ensureDirectory("thumbnails");
+        if (cloudinaryEnabled && cloudinary != null) {
+            return uploadToCloudinary(file, "image", "thumbnails");
+        }
+        return uploadToLocalStorage(file, "thumbnails");
+    }
+
+    private String uploadToCloudinary(MultipartFile file, String resourceType, String folder) throws IOException {
+        try {
+            Map uploadResult = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.asMap(
+                    "resource_type", resourceType,
+                    "folder", "shorts-service/" + folder,
+                    "unique_filename", true,
+                    "use_filename", false
+            ));
+            return (String) uploadResult.get("secure_url");
+        } catch (Exception e) {
+            throw new IOException("Cloudinary upload failed: " + e.getMessage(), e);
+        }
+    }
+
+    private String uploadToLocalStorage(MultipartFile file, String folder) throws IOException {
+        Path folderPath = ensureDirectory(folder);
         String fileName = generateFileName(file.getOriginalFilename());
-        Files.copy(file.getInputStream(), folder.resolve(fileName));
-        return storageBaseUrl + "/thumbnails/" + fileName;
+        Files.copy(file.getInputStream(), folderPath.resolve(fileName));
+        return storageBaseUrl + "/" + folder + "/" + fileName;
     }
 
     private void validateVideoType(MultipartFile file) {

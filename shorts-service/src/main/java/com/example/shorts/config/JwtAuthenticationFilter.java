@@ -8,6 +8,8 @@ import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -18,6 +20,8 @@ import java.util.Set;
 
 @Component
 public class JwtAuthenticationFilter extends GenericFilterBean {
+
+    private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     @Autowired
     private JwtUtils jwtUtils;
@@ -46,21 +50,45 @@ public class JwtAuthenticationFilter extends GenericFilterBean {
 
         String header = httpRequest.getHeader("Authorization");
         if (header == null || !header.startsWith("Bearer ")) {
+            logger.warn("Missing or invalid Authorization header for path: {}", path);
             httpResponse.setStatus(HttpStatus.UNAUTHORIZED.value());
             httpResponse.getWriter().write("Missing or invalid Authorization header");
             return;
         }
 
-        String token = header.substring(7);
+        String token = header.substring(7).trim();
+        
+        if (token.isEmpty()) {
+            logger.warn("Empty token provided for path: {}", path);
+            httpResponse.setStatus(HttpStatus.UNAUTHORIZED.value());
+            httpResponse.getWriter().write("Empty token provided");
+            return;
+        }
+
         if (!jwtUtils.validateToken(token)) {
+            logger.warn("Token validation failed for path: {} - token: {}", path, token.substring(0, Math.min(20, token.length())) + "...");
             httpResponse.setStatus(HttpStatus.UNAUTHORIZED.value());
             httpResponse.getWriter().write("Invalid or expired token");
             return;
         }
 
-        Claims claims = jwtUtils.parseClaims(token);
-        httpRequest.setAttribute("userId", claims.getSubject());
-        chain.doFilter(request, response);
+        try {
+            String userId = jwtUtils.getUserIdFromToken(token);
+            if (userId == null || userId.isBlank()) {
+                logger.warn("Token has no user identifier for path: {}", path);
+                httpResponse.setStatus(HttpStatus.UNAUTHORIZED.value());
+                httpResponse.getWriter().write("Token has no user identifier");
+                return;
+            }
+            httpRequest.setAttribute("userId", userId);
+            logger.debug("Token validated successfully for userId: {}", userId);
+            chain.doFilter(request, response);
+        } catch (Exception e) {
+            logger.error("Token parsing failed for path: {} - error: {}", path, e.getMessage(), e);
+            httpResponse.setStatus(HttpStatus.UNAUTHORIZED.value());
+            httpResponse.getWriter().write("Token parsing failed: " + e.getMessage());
+            return;
+        }
     }
 
     private boolean isProtectedPath(String path, String method) {

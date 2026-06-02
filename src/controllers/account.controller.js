@@ -70,9 +70,10 @@ const registerUser = async (req, res) => {
             throw new ApiError(400, "All fields are required");
         }
 
-        const checkUser = await newUser.findOne({
-            $or: [{ name }, { email }]
-        });
+        // const checkUser = await newUser.findOne({
+        //     $or: [{ name }, { email }]
+        // });
+        const checkUser = await newUser.findOne({ email });
 
         if (checkUser) {
             return res.status(400).json({ message: "User already exists" });

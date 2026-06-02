@@ -1,6 +1,7 @@
 com\example\shorts\model\ShortLike$ShortLikeBuilder.class
 com\example\shorts\service\ShortsService.class
 com\example\shorts\model\ShortModel.class
+com\example\shorts\config\CloudinaryConfig.class
 com\example\shorts\model\ShortComment$ShortCommentBuilder.class
 com\example\shorts\service\FileStorageService.class
 com\example\shorts\ShortsServiceApplication.class
