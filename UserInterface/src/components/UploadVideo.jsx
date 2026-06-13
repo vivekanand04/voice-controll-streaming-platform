@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom'
 import React, { useState } from 'react';
-// import ShortsUpload from './ShortsUpload';
+import ShortsUpload from './ShortsUpload';
 const API_BASE = import.meta.env.VITE_API_URL;
 function UploadVideo() {
     const [isModalOpen, setIsModalOpen] = useState(true);
@@ -171,11 +171,10 @@ function UploadVideo() {
                             </form>
                         ) : (
                             <div className="p-4 md:p-5">
-                                {/* <ShortsUpload onUploadSuccess={() => {
+                                <ShortsUpload onUploadSuccess={() => {
                                     setLoader(false);
                                     setIsModalOpen(false);
-                                    history('/your_channel');
-                                }} /> */}
+                                }} />
                             </div>
                         )}
                     </div>
