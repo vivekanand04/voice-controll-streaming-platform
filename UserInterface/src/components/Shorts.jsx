@@ -1,10 +1,8 @@
-
-
 import React from "react";
-// import ShortsFeed from "./ShortsFeed";
+import ShortsFeed from "./ShortsFeed";
 
 function Shorts() {
-  // return <ShortsFeed />;
+  return <ShortsFeed />;
 }
 
 export default Shorts;

@@ -122,6 +122,10 @@ public class ShortsService {
         return model.getCommentsCount();
     }
 
+    public List<ShortComment> getComments(String shortId) {
+        return commentRepository.findByShortIdOrderByCreatedAtDesc(shortId);
+    }
+
     public void deleteShort(String id, String userId) {
         ShortModel model = shortRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Short not found"));
         if (!model.getUploaderId().equals(userId)) {

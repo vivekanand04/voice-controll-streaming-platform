@@ -1,6 +1,7 @@
 package com.example.shorts.controller;
 
 import com.example.shorts.dto.ApiResponse;
+import com.example.shorts.model.ShortComment;
 import com.example.shorts.model.ShortModel;
 import com.example.shorts.service.ShortsService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -89,6 +90,11 @@ public class ShortsController {
         payload.put("commentsCount", commentsCount);
         payload.put("id", id);
         return ResponseEntity.ok(new ApiResponse<>(200, payload, "Comment added"));
+    }
+
+    @GetMapping("/{id}/comments")
+    public ResponseEntity<ApiResponse<List<ShortComment>>> getComments(@PathVariable String id) {
+        return ResponseEntity.ok(new ApiResponse<>(200, shortsService.getComments(id), "Short comments loaded"));
     }
 
     @DeleteMapping("/{id}")
