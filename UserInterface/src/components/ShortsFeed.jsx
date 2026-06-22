@@ -260,6 +260,7 @@ function ShortsFeed() {
     async (shortId) => {
       if (!shortId) return;
 
+      setCommentsByShort((previous) => ({ ...previous, [shortId]: [] }));
       setCommentsLoadingByShort((previous) => ({ ...previous, [shortId]: true }));
       setCommentsErrorByShort((previous) => ({ ...previous, [shortId]: "" }));
       const storedComments = readStoredComments(shortId);
@@ -306,12 +307,6 @@ function ShortsFeed() {
     },
     [normalizeCommentsResponse]
   );
-
-  useEffect(() => {
-    const shortId = getShortId(commentDrawerShort);
-    if (!shortId) return;
-    loadComments(shortId);
-  }, [commentDrawerShort, loadComments]);
 
   const handleAddComment = useCallback(
     async (shortId, text) => {
@@ -399,10 +394,21 @@ function ShortsFeed() {
     [goNext, goPrevious]
   );
 
+  const commentsOpen = !!commentDrawerShort;
   const activeShortForDrawer = useMemo(() => {
-    if (!commentDrawerShort) return null;
-    return shorts.find((short) => getShortId(short) === getShortId(commentDrawerShort)) || commentDrawerShort;
-  }, [commentDrawerShort, shorts]);
+    if (!commentsOpen) return null;
+    return (
+      shorts.find((short) => getShortId(short) === activeId) ||
+      shorts.find((short) => getShortId(short) === getShortId(commentDrawerShort)) ||
+      commentDrawerShort
+    );
+  }, [activeId, commentDrawerShort, commentsOpen, shorts]);
+
+  useEffect(() => {
+    const shortId = getShortId(activeShortForDrawer);
+    if (!commentsOpen || !shortId) return;
+    loadComments(shortId);
+  }, [activeShortForDrawer, commentsOpen, loadComments]);
 
   return (
     <section className="relative mt-[33px] h-[calc(100vh-65px)] overflow-hidden bg-gray-50 px-2 py-[5px] text-white sm:px-4" onKeyDown={handleKeyDown} tabIndex={0}>
