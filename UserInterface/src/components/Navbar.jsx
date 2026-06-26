@@ -4,11 +4,12 @@
 import { useState, useEffect, useRef } from 'react';
 import React from 'react';
 import logo from '../assets/file.svg';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../store/slice/authSlice';
 import axios from 'axios';
 import { FiUpload, FiFileText } from "react-icons/fi";
+import { getShortsVoiceAction } from '../hooks/useShortsVoiceCommands';
 
 function Navbar({ openChange }) {
   const [userdata, setUserData] = useState(null);
@@ -20,9 +21,11 @@ function Navbar({ openChange }) {
   const searchInputRef = useRef(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const authStatus = useSelector((state) => state.auth.status);
   const data = useSelector((state) => state.auth.user);
   const [statusMessage, setStatusMessage] = useState('');
+  const isShortsRoute = location.pathname.startsWith('/shorts');
 
   // recognition refs
   const recognitionRef = useRef(null);
@@ -158,6 +161,19 @@ function Navbar({ openChange }) {
   };
 
   useEffect(() => {
+    if (!isShortsRoute && voiceMode === 'command' && recognitionRef.current?.continuous) {
+      try { recognitionRef.current.stop(); } catch (e) { }
+    }
+  }, [isShortsRoute, voiceMode]);
+
+  useEffect(() => {
+    return () => {
+      try { recognitionRef.current?.abort(); } catch (e) { }
+      try { queryRecRef.current?.abort(); } catch (e) { }
+    };
+  }, []);
+
+  useEffect(() => {
     if (mobileSearchOpen) {
       const t = setTimeout(() => {
         try { searchInputRef.current?.focus(); } catch (e) { }
@@ -208,7 +224,7 @@ function Navbar({ openChange }) {
   const startCommandRecognition = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert('Your browser does not support voice commands.');
+      setStatusMessage('Voice commands are not supported in this browser.');
       return;
     }
 
@@ -221,6 +237,7 @@ function Navbar({ openChange }) {
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
     recognition.interimResults = false;
+    recognition.continuous = isShortsRoute;
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
@@ -230,9 +247,42 @@ function Navbar({ openChange }) {
     };
 
     recognition.onresult = (event) => {
-      const transcriptRaw = event.results[0][0].transcript.trim();
+      const currentResult = event.results[event.resultIndex] || event.results[0];
+      const transcriptRaw = currentResult?.[0]?.transcript?.trim() || '';
+      if (!transcriptRaw) return;
       const transcript = transcriptRaw.toLowerCase();
       console.log('navbar transcript:', transcript);
+
+      const shortsVoiceAction = getShortsVoiceAction(transcript);
+      const isShortsLocalCommand =
+        shortsVoiceAction ||
+        transcript.includes('next') ||
+        transcript.includes('swipe up') ||
+        transcript.includes('previous') ||
+        transcript.includes('swipe down') ||
+        transcript.includes('comment') ||
+        transcript.includes('like');
+
+      if (isShortsRoute && isShortsLocalCommand) {
+        const eventName = shortsVoiceAction ? 'shorts-voice-command' : 'voice-command';
+        const dispatchShortsCommand = () => {
+          window.dispatchEvent(new CustomEvent(eventName, { detail: transcript }));
+        };
+
+        if (shortsVoiceAction === 'comment') {
+          try { recognition.stop(); } catch (e) { /* ignore */ }
+          recognitionRef.current = null;
+          setIsListening(false);
+          setVoiceMode(null);
+          setStatusMessage('Recording Shorts comment...');
+          setTimeout(dispatchShortsCommand, 120);
+          return;
+        }
+
+        dispatchShortsCommand();
+        setStatusMessage(`Shorts command: "${transcriptRaw}"`);
+        return;
+      }
 
       // Stop this recognition right away so other components can start their own (prevents contention)
       try { recognition.stop(); } catch (e) { /* ignore */ }
@@ -352,6 +402,7 @@ function Navbar({ openChange }) {
 
     recognition.onerror = (ev) => {
       console.error('recognition error', ev);
+      setStatusMessage('Voice command recognition error.');
     };
     recognition.onend = () => {
       setIsListening(false);

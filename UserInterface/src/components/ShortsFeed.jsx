@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import axios from "axios";
 import { useSelector } from "react-redux";
 import ShortsCard from "./ShortsCard";
+import useShortsVoiceCommands from "../hooks/useShortsVoiceCommands";
 
 const API_BASE = (import.meta.env.VITE_SHORTS_API_URL ?? "http://localhost:8081").replace(/\/$/, "");
 const APP_API_BASE = (import.meta.env.VITE_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
@@ -72,17 +73,25 @@ function ShortsFeed() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState("");
   const [muted, setMuted] = useState(true);
+  const [shortMuteOverrides, setShortMuteOverrides] = useState({});
   const [commentDrafts, setCommentDrafts] = useState({});
   const [commentsByShort, setCommentsByShort] = useState({});
   const [commentsLoadingByShort, setCommentsLoadingByShort] = useState({});
   const [commentsErrorByShort, setCommentsErrorByShort] = useState({});
   const [commentDrawerShort, setCommentDrawerShort] = useState(null);
+  const [voiceCommentMessage, setVoiceCommentMessage] = useState("");
+  const [voiceCommentRecording, setVoiceCommentRecording] = useState(false);
   const feedRef = useRef(null);
   const itemRefs = useRef(new Map());
   const observerRef = useRef(null);
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(true);
   const viewedRef = useRef(new Set());
+  const voiceCommentRecognitionRef = useRef(null);
+  const voiceCommentTimeoutRef = useRef(null);
+  const voiceCommentTextRef = useRef("");
+  const voiceCommentDeadlineRef = useRef(0);
+  const voiceCommentFinalizingRef = useRef(false);
 
   const activeIndex = useMemo(
     () => shorts.findIndex((short) => getShortId(short) === activeId),
@@ -206,6 +215,24 @@ function ShortsFeed() {
     if (!shorts.length) return;
     scrollToIndex((activeIndex < 0 ? 0 : activeIndex) - 1);
   }, [activeIndex, scrollToIndex, shorts.length]);
+
+  const playActiveShort = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("shorts-play"));
+  }, []);
+
+  const pauseActiveShort = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("shorts-pause"));
+  }, []);
+
+  const muteActiveShort = useCallback(() => {
+    if (!activeId) return;
+    setShortMuteOverrides((previous) => ({ ...previous, [activeId]: true }));
+  }, [activeId]);
+
+  const unmuteActiveShort = useCallback(() => {
+    if (!activeId) return;
+    setShortMuteOverrides((previous) => ({ ...previous, [activeId]: false }));
+  }, [activeId]);
 
   const updateShort = useCallback((shortId, updater) => {
     setShorts((previous) =>
@@ -360,19 +387,167 @@ function ShortsFeed() {
     [accessToken, updateShort]
   );
 
+  const stopVoiceCommentRecorder = useCallback(() => {
+    if (voiceCommentTimeoutRef.current) {
+      clearTimeout(voiceCommentTimeoutRef.current);
+      voiceCommentTimeoutRef.current = null;
+    }
+    if (voiceCommentRecognitionRef.current) {
+      try {
+        voiceCommentRecognitionRef.current.stop();
+      } catch (err) {
+        // The recorder may already be stopped by the browser.
+      }
+    }
+  }, []);
+
+  const startVoiceCommentRecorder = useCallback(() => {
+    const shortId = activeId;
+    const activeShort = shorts.find((short) => getShortId(short) === shortId);
+    if (!shortId || !activeShort) return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setVoiceCommentMessage("Voice comments are not supported in this browser.");
+      return;
+    }
+
+    if (voiceCommentRecognitionRef.current) {
+      try {
+        voiceCommentRecognitionRef.current.abort();
+      } catch (err) {
+        // Best-effort cleanup before starting a fresh comment recorder.
+      }
+      voiceCommentRecognitionRef.current = null;
+    }
+    if (voiceCommentTimeoutRef.current) {
+      clearTimeout(voiceCommentTimeoutRef.current);
+      voiceCommentTimeoutRef.current = null;
+    }
+
+    voiceCommentTextRef.current = "";
+    voiceCommentDeadlineRef.current = Date.now() + 10000;
+    voiceCommentFinalizingRef.current = false;
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.continuous = true;
+
+    recognition.onstart = () => {
+      setVoiceCommentRecording(true);
+      setVoiceCommentMessage("Record your comment for the next 10 seconds");
+    };
+
+    recognition.onresult = (event) => {
+      let spokenText = "";
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        if (event.results[index].isFinal) {
+          spokenText += event.results[index][0].transcript;
+        }
+      }
+      if (spokenText.trim()) {
+        voiceCommentTextRef.current = `${voiceCommentTextRef.current} ${spokenText}`.trim();
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Shorts voice comment error", event);
+      setVoiceCommentMessage("Unable to record comment. Please try again.");
+    };
+
+    recognition.onend = async () => {
+      if (!voiceCommentFinalizingRef.current && Date.now() < voiceCommentDeadlineRef.current - 150) {
+        try {
+          recognition.start();
+          voiceCommentRecognitionRef.current = recognition;
+          return;
+        } catch (err) {
+          voiceCommentFinalizingRef.current = true;
+        }
+      }
+
+      if (voiceCommentTimeoutRef.current) {
+        clearTimeout(voiceCommentTimeoutRef.current);
+        voiceCommentTimeoutRef.current = null;
+      }
+      voiceCommentFinalizingRef.current = false;
+      voiceCommentRecognitionRef.current = null;
+      setVoiceCommentRecording(false);
+
+      const recordedComment = voiceCommentTextRef.current.trim();
+      voiceCommentTextRef.current = "";
+
+      if (!recordedComment) {
+        setVoiceCommentMessage("No comment detected.");
+        return;
+      }
+
+      try {
+        await handleAddComment(shortId, recordedComment);
+        handleOpenComments(activeShort);
+        setVoiceCommentMessage("Comment posted.");
+      } catch (err) {
+        setVoiceCommentMessage("Unable to add comment. Please sign in and try again.");
+      }
+    };
+
+    voiceCommentRecognitionRef.current = recognition;
+    try {
+      recognition.start();
+      voiceCommentTimeoutRef.current = setTimeout(() => {
+        voiceCommentFinalizingRef.current = true;
+        stopVoiceCommentRecorder();
+      }, 10000);
+    } catch (err) {
+      console.error("Shorts voice comment start failed", err);
+      voiceCommentRecognitionRef.current = null;
+      setVoiceCommentRecording(false);
+      setVoiceCommentMessage("Recording failed. Please try again.");
+    }
+  }, [activeId, handleAddComment, handleOpenComments, shorts, stopVoiceCommentRecorder]);
+
+  useShortsVoiceCommands({
+    onPlay: playActiveShort,
+    onPause: pauseActiveShort,
+    onMute: muteActiveShort,
+    onUnmute: unmuteActiveShort,
+    onLike: () => {
+      if (activeId) handleLike(activeId);
+    },
+    onComment: startVoiceCommentRecorder,
+  });
+
+  useEffect(() => {
+    return () => {
+      if (voiceCommentTimeoutRef.current) clearTimeout(voiceCommentTimeoutRef.current);
+      if (voiceCommentRecognitionRef.current) {
+        try {
+          voiceCommentRecognitionRef.current.abort();
+        } catch (err) {
+          // Ignore cleanup errors from an already-ended recorder.
+        }
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!voiceCommentMessage || voiceCommentRecording) return;
+    const timeoutId = setTimeout(() => setVoiceCommentMessage(""), 3000);
+    return () => clearTimeout(timeoutId);
+  }, [voiceCommentMessage, voiceCommentRecording]);
+
   const handleVoiceCommand = useCallback(
     (event) => {
-      const transcript = String(event.detail || "").toLowerCase();
+      const detail = event?.detail ?? event;
+      const transcript = String(
+        typeof detail === "string" ? detail : detail?.text || detail?.transcript || ""
+      ).toLowerCase();
+
       if (transcript.includes("next") || transcript.includes("swipe up")) goNext();
       else if (transcript.includes("previous") || transcript.includes("swipe down") || transcript.includes("back")) goPrevious();
-      else if (transcript.includes("mute")) setMuted(true);
-      else if (transcript.includes("unmute")) setMuted(false);
-      else if (transcript.includes("pause")) window.dispatchEvent(new CustomEvent("shorts-pause"));
-      else if (transcript.includes("play")) window.dispatchEvent(new CustomEvent("shorts-play"));
-      else if (transcript.includes("like") && activeId) handleLike(activeId);
-      else if (transcript.includes("comment") && activeIndex >= 0) handleOpenComments(shorts[activeIndex]);
     },
-    [activeId, activeIndex, goNext, goPrevious, handleLike, handleOpenComments, shorts]
+    [goNext, goPrevious]
   );
 
   useEffect(() => {
@@ -434,6 +609,15 @@ function ShortsFeed() {
         </div>
       )}
 
+      {voiceCommentMessage && (
+        <div className="pointer-events-none absolute left-1/2 top-4 z-[720] w-[min(92vw,360px)] -translate-x-1/2 rounded-lg bg-gray-950 px-4 py-3 text-center text-sm font-semibold text-white shadow-xl">
+          {voiceCommentRecording && (
+            <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-red-500 align-middle" />
+          )}
+          {voiceCommentMessage}
+        </div>
+      )}
+
       <div
         ref={feedRef}
         className="relative mx-auto h-[calc(100vh-75px)] max-w-[1120px] snap-y snap-mandatory overflow-y-auto overflow-x-hidden overscroll-contain scroll-smooth rounded-lg bg-gray-50"
@@ -442,6 +626,7 @@ function ShortsFeed() {
         {shorts.map((short, index) => {
           const shortId = getShortId(short);
           const distance = Math.abs(index - activeIndex);
+          const isShortMuted = shortMuteOverrides[shortId] ?? muted;
 
           return (
             <div
@@ -455,9 +640,12 @@ function ShortsFeed() {
               <ShortsCard
                 short={short}
                 isActive={shortId === activeId}
-                isMuted={muted}
+                isMuted={isShortMuted}
                 shouldLoad={distance <= 2 || activeIndex < 0}
-                onToggleMute={() => setMuted((previous) => !previous)}
+                onToggleMute={() => {
+                  setShortMuteOverrides({});
+                  setMuted((previous) => !previous);
+                }}
                 onLike={() => handleLike(shortId)}
                 onOpenComments={() => handleOpenComments(short)}
                 apiBase={API_BASE}
