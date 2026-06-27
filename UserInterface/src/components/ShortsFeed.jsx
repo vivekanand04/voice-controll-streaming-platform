@@ -57,6 +57,34 @@ const writeStoredComment = (shortId, comment) => {
   }
 };
 
+const removeStoredComment = (shortId, commentId) => {
+  try {
+    const allComments = JSON.parse(localStorage.getItem(SHORTS_COMMENTS_STORAGE_KEY) || "{}");
+    const previous = Array.isArray(allComments[shortId]) ? allComments[shortId] : [];
+    const next = previous.filter((item) => item.id !== commentId);
+    if (next.length === 0) {
+      delete allComments[shortId];
+    } else {
+      allComments[shortId] = next;
+    }
+    localStorage.setItem(SHORTS_COMMENTS_STORAGE_KEY, JSON.stringify(allComments));
+  } catch (err) {
+    // Local persistence is best effort only.
+  }
+};
+
+const getCommentContent = (comment) =>
+  (comment?.comment || comment?.text || comment?.content || "").trim().toLowerCase();
+
+const mergeCommentsList = (localComments, remoteComments) => {
+  const remoteTexts = new Set(remoteComments.map(getCommentContent).filter(Boolean));
+  const pendingLocal = localComments.filter((comment) => {
+    const text = getCommentContent(comment);
+    return text && !remoteTexts.has(text);
+  });
+  return [...remoteComments, ...pendingLocal];
+};
+
 const isUnavailableCommentsEndpoint = (err) => {
   const status = err?.response?.status;
   const message = err?.response?.data?.message || err?.response?.data || err?.message || "";
@@ -65,6 +93,7 @@ const isUnavailableCommentsEndpoint = (err) => {
 
 function ShortsFeed() {
   const accessToken = useSelector((state) => state.auth.accessToken);
+  const user = useSelector((state) => state.auth.user);
   const [shorts, setShorts] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [page, setPage] = useState(0);
@@ -302,7 +331,7 @@ function ShortsFeed() {
         const remoteComments = normalizeCommentsResponse(response);
         setCommentsByShort((previous) => ({
           ...previous,
-          [shortId]: [...storedComments, ...remoteComments],
+          [shortId]: mergeCommentsList(storedComments, remoteComments),
         }));
       } catch (err) {
         console.error("Failed to load comments", err);
@@ -314,7 +343,7 @@ function ShortsFeed() {
             const fallbackComments = normalizeCommentsResponse(fallbackResponse);
             setCommentsByShort((previous) => ({
               ...previous,
-              [shortId]: [...storedComments, ...fallbackComments],
+              [shortId]: mergeCommentsList(storedComments, fallbackComments),
             }));
             setCommentsErrorByShort((previous) => ({ ...previous, [shortId]: "" }));
           } catch (fallbackErr) {
@@ -348,7 +377,6 @@ function ShortsFeed() {
         createdAt: new Date().toISOString(),
       };
 
-      writeStoredComment(shortId, newComment);
       setCommentDrafts((previous) => ({
         ...previous,
         [shortId]: [newComment, ...(previous[shortId] || [])],
@@ -371,8 +399,31 @@ function ShortsFeed() {
         if (typeof nextCount === "number") {
           updateShort(shortId, (short) => ({ ...short, commentsCount: nextCount }));
         }
+
+        removeStoredComment(shortId, newComment.id);
+        setCommentDrafts((previous) => ({
+          ...previous,
+          [shortId]: (previous[shortId] || []).filter((comment) => comment.id !== newComment.id),
+        }));
+
+        const commenterName =
+          user?.name || user?.username || user?.email?.split("@")[0] || "You";
+        const confirmedComment = {
+          ...newComment,
+          commenterName,
+        };
+        setCommentsByShort((previous) => {
+          const existing = previous[shortId] || [];
+          const text = getCommentContent(confirmedComment);
+          const filtered = existing.filter((comment) => getCommentContent(comment) !== text);
+          return {
+            ...previous,
+            [shortId]: [confirmedComment, ...filtered],
+          };
+        });
       } catch (err) {
         console.error("Comment failed", err);
+        writeStoredComment(shortId, newComment);
         setCommentDrafts((previous) => ({
           ...previous,
           [shortId]: (previous[shortId] || []).filter((comment) => comment.id !== newComment.id),
@@ -384,7 +435,7 @@ function ShortsFeed() {
         throw err;
       }
     },
-    [accessToken, updateShort]
+    [accessToken, updateShort, user]
   );
 
   const stopVoiceCommentRecorder = useCallback(() => {

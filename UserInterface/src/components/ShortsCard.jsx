@@ -69,12 +69,20 @@ function CommentsDrawer({ short, comments = [], localComments = [], loading, err
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const visibleComments = useMemo(() => {
+    const loadedTexts = new Set(
+      comments.map((comment) => getCommentText(comment).trim().toLowerCase()).filter(Boolean)
+    );
+    const pendingLocal = localComments.filter((comment) => {
+      const text = getCommentText(comment).trim().toLowerCase();
+      return text && !loadedTexts.has(text);
+    });
     const seen = new Set();
-    return [...localComments, ...comments].filter((comment, index) => {
+    return [...pendingLocal, ...comments].filter((comment, index) => {
+      const text = getCommentText(comment).trim().toLowerCase();
       const key =
         comment.id ||
         comment._id ||
-        `${getCommentName(comment)}-${getCommentText(comment)}-${comment.createdAt || index}`;
+        (text ? `text:${text}` : `${getCommentName(comment)}-${comment.createdAt || index}`);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
