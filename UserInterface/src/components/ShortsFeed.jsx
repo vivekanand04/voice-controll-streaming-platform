@@ -3,11 +3,13 @@ import axios from "axios";
 import { useSelector } from "react-redux";
 import ShortsCard from "./ShortsCard";
 import useShortsVoiceCommands from "../hooks/useShortsVoiceCommands";
+import useShortsAutoScroll from "../hooks/useShortsAutoScroll";
 
 const API_BASE = (import.meta.env.VITE_SHORTS_API_URL ?? "http://localhost:8081").replace(/\/$/, "");
 const APP_API_BASE = (import.meta.env.VITE_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
 const PAGE_SIZE = 6;
 const SHORTS_COMMENTS_STORAGE_KEY = "shorts:comments";
+const SHORTS_LIKES_STORAGE_PREFIX = "shorts:liked";
 
 const getPersistedAccessToken = () => {
   const directToken = localStorage.getItem("token") || localStorage.getItem("accessToken");
@@ -27,15 +29,104 @@ const getAuthHeaders = (accessToken) => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-const normalizeShort = (short) => ({
-  ...short,
-  views: short.views ?? 0,
-  likes: short.likes ?? 0,
-  commentsCount: short.commentsCount ?? 0,
-  tags: Array.isArray(short.tags) ? short.tags : [],
-});
-
 const getShortId = (short) => short?.id ?? short?._id;
+
+const decodeJwtPayload = (token) => {
+  if (!token || typeof token !== "string") return null;
+  const payload = token.split(".")[1];
+  if (!payload) return null;
+
+  try {
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    return JSON.parse(window.atob(padded));
+  } catch (err) {
+    return null;
+  }
+};
+
+const getShortsLikesStorageKey = (user, accessToken) => {
+  const token = accessToken || getPersistedAccessToken();
+  const tokenPayload = decodeJwtPayload(token);
+  const userId =
+    user?._id ||
+    user?.id ||
+    user?.userId ||
+    user?.email ||
+    user?.username ||
+    tokenPayload?.sub ||
+    tokenPayload?._id ||
+    tokenPayload?.id ||
+    null;
+
+  return userId ? `${SHORTS_LIKES_STORAGE_PREFIX}:${userId}` : null;
+};
+
+const readStoredLikedShortIds = (storageKey) => {
+  if (!storageKey) return new Set();
+
+  try {
+    const storedValue = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    if (Array.isArray(storedValue)) return new Set(storedValue.filter(Boolean));
+    if (storedValue && typeof storedValue === "object") {
+      return new Set(Object.keys(storedValue).filter((shortId) => storedValue[shortId]));
+    }
+  } catch (err) {
+    // If stored data is malformed, ignore it and rebuild from future likes.
+  }
+
+  return new Set();
+};
+
+const writeStoredLikedShortIds = (storageKey, likedShortIds) => {
+  if (!storageKey) return;
+
+  try {
+    localStorage.setItem(storageKey, JSON.stringify([...likedShortIds]));
+  } catch (err) {
+    // Local persistence is best effort; the backend like request remains authoritative for counts.
+  }
+};
+
+const setStoredShortLike = (storageKey, shortId, liked) => {
+  if (!storageKey || !shortId) return readStoredLikedShortIds(storageKey);
+
+  const likedShortIds = readStoredLikedShortIds(storageKey);
+  if (liked) likedShortIds.add(shortId);
+  else likedShortIds.delete(shortId);
+  writeStoredLikedShortIds(storageKey, likedShortIds);
+  return likedShortIds;
+};
+
+const getServerViewerLiked = (short) =>
+  Boolean(
+    short?.viewerLiked ??
+      short?.viewerHasLiked ??
+      short?.likedByCurrentUser ??
+      short?.liked
+  );
+
+const getResolvedViewerLiked = (short, likedShortIds) => {
+  const shortId = getShortId(short);
+  return Boolean(short?.viewerLikedFromServer || (shortId && likedShortIds.has(shortId)));
+};
+
+const normalizeShort = (short, likedShortIds = new Set()) => {
+  const viewerLikedFromServer = getServerViewerLiked(short);
+  const normalized = {
+    ...short,
+    views: short.views ?? 0,
+    likes: short.likes ?? 0,
+    commentsCount: short.commentsCount ?? 0,
+    tags: Array.isArray(short.tags) ? short.tags : [],
+    viewerLikedFromServer,
+  };
+
+  return {
+    ...normalized,
+    viewerLiked: getResolvedViewerLiked(normalized, likedShortIds),
+  };
+};
 
 const readStoredComments = (shortId) => {
   try {
@@ -94,6 +185,11 @@ const isUnavailableCommentsEndpoint = (err) => {
 function ShortsFeed() {
   const accessToken = useSelector((state) => state.auth.accessToken);
   const user = useSelector((state) => state.auth.user);
+  const authStatus = useSelector((state) => state.auth.status);
+  const likedShortsStorageKey = useMemo(
+    () => (authStatus || user ? getShortsLikesStorageKey(user, accessToken) : null),
+    [accessToken, authStatus, user]
+  );
   const [shorts, setShorts] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [page, setPage] = useState(0);
@@ -127,6 +223,16 @@ function ShortsFeed() {
     [activeId, shorts]
   );
 
+  useEffect(() => {
+    const likedShortIds = readStoredLikedShortIds(likedShortsStorageKey);
+    setShorts((previous) =>
+      previous.map((short) => ({
+        ...short,
+        viewerLiked: getResolvedViewerLiked(short, likedShortIds),
+      }))
+    );
+  }, [likedShortsStorageKey]);
+
   const loadShorts = useCallback(
     async (pageToLoad = 0) => {
       if (loadingRef.current || (!hasMoreRef.current && pageToLoad !== 0)) return;
@@ -139,7 +245,10 @@ function ShortsFeed() {
           params: { page: pageToLoad, size: PAGE_SIZE },
           withCredentials: true,
         });
-        const nextShorts = (response.data?.data || []).map(normalizeShort);
+        const likedShortIds = readStoredLikedShortIds(likedShortsStorageKey);
+        const nextShorts = (response.data?.data || []).map((short) =>
+          normalizeShort(short, likedShortIds)
+        );
 
         setShorts((previous) => {
           const merged = pageToLoad === 0 ? [] : [...previous];
@@ -167,7 +276,7 @@ function ShortsFeed() {
         loadingRef.current = false;
       }
     },
-    []
+    [likedShortsStorageKey]
   );
 
   useEffect(() => {
@@ -236,14 +345,30 @@ function ShortsFeed() {
   );
 
   const goNext = useCallback(() => {
-    if (!shorts.length) return;
-    scrollToIndex((activeIndex < 0 ? 0 : activeIndex) + 1);
+    if (!shorts.length) return false;
+    const current = activeIndex < 0 ? 0 : activeIndex;
+    if (current >= shorts.length - 1) return false;
+    scrollToIndex(current + 1);
+    return true;
   }, [activeIndex, scrollToIndex, shorts.length]);
 
   const goPrevious = useCallback(() => {
-    if (!shorts.length) return;
-    scrollToIndex((activeIndex < 0 ? 0 : activeIndex) - 1);
+    if (!shorts.length) return false;
+    const current = activeIndex < 0 ? 0 : activeIndex;
+    if (current <= 0) return false;
+    scrollToIndex(current - 1);
+    return true;
   }, [activeIndex, scrollToIndex, shorts.length]);
+
+  const { autoScrollNotice, stopAutoScroll } = useShortsAutoScroll({
+    feedRef,
+    itemRefs,
+    activeId,
+    activeIndex,
+    shortsLength: shorts.length,
+    goNext,
+    goPrevious,
+  });
 
   const playActiveShort = useCallback(() => {
     window.dispatchEvent(new CustomEvent("shorts-play"));
@@ -274,6 +399,11 @@ function ShortsFeed() {
       const previousShort = shorts.find((short) => getShortId(short) === shortId);
       if (!previousShort) return;
 
+      const wasLiked = Boolean(previousShort.viewerLiked);
+      const nextLiked = !wasLiked;
+      const previousLikes = Number(previousShort.likes ?? 0);
+      setStoredShortLike(likedShortsStorageKey, shortId, nextLiked);
+
       updateShort(shortId, (short) => ({
         ...short,
         likes: Math.max(0, (short.likes ?? 0) + (short.viewerLiked ? -1 : 1)),
@@ -288,13 +418,18 @@ function ShortsFeed() {
         const nextLikes = response.data?.data?.likes;
         if (typeof nextLikes === "number") {
           updateShort(shortId, (short) => ({ ...short, likes: nextLikes }));
+          const confirmedLiked =
+            nextLikes > previousLikes ? true : nextLikes < previousLikes ? false : nextLiked;
+          setStoredShortLike(likedShortsStorageKey, shortId, confirmedLiked);
+          updateShort(shortId, (short) => ({ ...short, viewerLiked: confirmedLiked }));
         }
       } catch (err) {
         console.error("Like failed", err);
+        setStoredShortLike(likedShortsStorageKey, shortId, wasLiked);
         updateShort(shortId, () => previousShort);
       }
     },
-    [accessToken, shorts, updateShort]
+    [accessToken, likedShortsStorageKey, shorts, updateShort]
   );
 
   const handleOpenComments = useCallback((short) => {
@@ -610,14 +745,16 @@ function ShortsFeed() {
     (event) => {
       if (event.key === "ArrowDown" || event.key === "PageDown") {
         event.preventDefault();
+        stopAutoScroll("Auto-scroll paused: manually interrupted.");
         goNext();
       }
       if (event.key === "ArrowUp" || event.key === "PageUp") {
         event.preventDefault();
+        stopAutoScroll("Auto-scroll paused: manually interrupted.");
         goPrevious();
       }
     },
-    [goNext, goPrevious]
+    [goNext, goPrevious, stopAutoScroll]
   );
 
   const commentsOpen = !!commentDrawerShort;
@@ -660,12 +797,12 @@ function ShortsFeed() {
         </div>
       )}
 
-      {voiceCommentMessage && (
+      {(voiceCommentMessage || autoScrollNotice) && (
         <div className="pointer-events-none absolute left-1/2 top-4 z-[720] w-[min(92vw,360px)] -translate-x-1/2 rounded-lg bg-gray-950 px-4 py-3 text-center text-sm font-semibold text-white shadow-xl">
           {voiceCommentRecording && (
             <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-red-500 align-middle" />
           )}
-          {voiceCommentMessage}
+          {voiceCommentMessage || autoScrollNotice}
         </div>
       )}
 

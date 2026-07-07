@@ -298,6 +298,81 @@ function ShortsCard({
     };
   }, [isActive]);
 
+  useEffect(() => {
+    if (!isActive) return undefined;
+
+    const video = videoRef.current;
+    if (!video) return undefined;
+
+    const shortId = short.id ?? short._id;
+    let completed = false;
+    let lastTime = 0;
+    let notifiedRunning = false;
+
+    const getProgressPercent = () => {
+      if (!video.duration || Number.isNaN(video.duration)) return 0;
+      return (video.currentTime / video.duration) * 100;
+    };
+
+    const notifyComplete = () => {
+      if (completed) return;
+      completed = true;
+      window.dispatchEvent(
+        new CustomEvent("shorts-playback-complete", { detail: { shortId } })
+      );
+    };
+
+    const notifyRunning = () => {
+      if (notifiedRunning || completed) return;
+      notifiedRunning = true;
+      window.dispatchEvent(
+        new CustomEvent("shorts-playback-running", { detail: { shortId } })
+      );
+    };
+
+    const checkCompletion = () => {
+      if (Math.round(getProgressPercent()) >= 100) {
+        notifyComplete();
+      }
+    };
+
+    const onTimeUpdate = () => {
+      const currentTime = video.currentTime;
+      if (!video.paused && currentTime > 0 && getProgressPercent() < 99) {
+        notifyRunning();
+      }
+      if (
+        video.duration &&
+        lastTime > 0 &&
+        lastTime / video.duration >= 0.99 &&
+        currentTime < 0.5 &&
+        currentTime < lastTime
+      ) {
+        notifyComplete();
+      }
+      lastTime = currentTime;
+      checkCompletion();
+    };
+
+    const onPlaying = () => {
+      if (getProgressPercent() < 99) notifyRunning();
+    };
+
+    const onEnded = () => {
+      notifyComplete();
+    };
+
+    video.addEventListener("playing", onPlaying);
+    video.addEventListener("timeupdate", onTimeUpdate);
+    video.addEventListener("ended", onEnded);
+
+    return () => {
+      video.removeEventListener("playing", onPlaying);
+      video.removeEventListener("timeupdate", onTimeUpdate);
+      video.removeEventListener("ended", onEnded);
+    };
+  }, [isActive, short._id, short.id, videoUrl]);
+
   const togglePlayback = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;

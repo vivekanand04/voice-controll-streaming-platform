@@ -10,6 +10,7 @@ import { logout } from '../store/slice/authSlice';
 import axios from 'axios';
 import { FiUpload, FiFileText } from "react-icons/fi";
 import { getShortsVoiceAction } from '../hooks/useShortsVoiceCommands';
+import { getShortsScrollAction } from '../hooks/useShortsAutoScroll';
 
 function Navbar({ openChange }) {
   const [userdata, setUserData] = useState(null);
@@ -239,6 +240,7 @@ function Navbar({ openChange }) {
     recognition.interimResults = false;
     recognition.continuous = isShortsRoute;
     recognition.maxAlternatives = 1;
+    let commandHandled = false;
 
     recognition.onstart = () => {
       setIsListening(true);
@@ -247,11 +249,41 @@ function Navbar({ openChange }) {
     };
 
     recognition.onresult = (event) => {
+      if (commandHandled) return;
       const currentResult = event.results[event.resultIndex] || event.results[0];
       const transcriptRaw = currentResult?.[0]?.transcript?.trim() || '';
       if (!transcriptRaw) return;
       const transcript = transcriptRaw.toLowerCase();
       console.log('navbar transcript:', transcript);
+
+      if (isShortsRoute) {
+        const shortsScrollAction = getShortsScrollAction(transcript);
+        if (shortsScrollAction) {
+          const scrollCommandDetail = { action: shortsScrollAction, accepted: false };
+          window.dispatchEvent(
+            new CustomEvent('shorts-scroll-command', { detail: scrollCommandDetail })
+          );
+
+          if (shortsScrollAction === 'scroll-one') {
+            if (scrollCommandDetail.accepted) {
+              commandHandled = true;
+              try { recognition.stop(); } catch (e) { /* ignore */ }
+              recognitionRef.current = null;
+              setIsListening(false);
+              setVoiceMode(null);
+              setStatusMessage('Scroll One');
+            } else {
+              setStatusMessage('Scroll One is not available right now');
+            }
+            return;
+          }
+
+          if (shortsScrollAction === 'stop') setStatusMessage(scrollCommandDetail.accepted ? 'Auto-scroll stopped' : 'No auto-scroll is running');
+          else if (shortsScrollAction === 'scroll-down') setStatusMessage('Scrolling Shorts down');
+          else if (shortsScrollAction === 'scroll-up') setStatusMessage('Scrolling Shorts up');
+          return;
+        }
+      }
 
       const shortsVoiceAction = getShortsVoiceAction(transcript);
       const isShortsLocalCommand =
@@ -318,6 +350,11 @@ function Navbar({ openChange }) {
       if (wordNumber && wordNumber > 0) {
         window.dispatchEvent(new CustomEvent('play-index', { detail: { index: wordNumber } }));
         setStatusMessage(`Playing video #${wordNumber}`);
+        return;
+      }
+
+      // Shorts feed handles its own scroll voice commands; never start window scroll there.
+      if (isShortsRoute && transcript.includes('scroll')) {
         return;
       }
 
