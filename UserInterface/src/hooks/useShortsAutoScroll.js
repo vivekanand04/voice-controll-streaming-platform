@@ -25,7 +25,6 @@ export const getShortsScrollAction = (command) => {
 };
 
 const CONTINUOUS_PAUSE_MS = 500;
-const SCROLL_ONE_START_TIMEOUT_MS = 1500;
 
 const createIdleState = (sessionId = 0) => ({
   active: false,
@@ -34,12 +33,10 @@ const createIdleState = (sessionId = 0) => ({
   watchShortId: null,
   lastIndex: -1,
   sessionId,
-  pendingStart: false,
 });
 
 function useShortsAutoScroll({
   feedRef,
-  itemRefs,
   activeId,
   activeIndex,
   shortsLength,
@@ -48,20 +45,12 @@ function useShortsAutoScroll({
 }) {
   const [autoScrollNotice, setAutoScrollNotice] = useState("");
   const delayTimerRef = useRef(null);
-  const scrollOneStartTimerRef = useRef(null);
   const stateRef = useRef(createIdleState());
 
   const clearContinuousDelay = useCallback(() => {
     if (delayTimerRef.current) {
       clearTimeout(delayTimerRef.current);
       delayTimerRef.current = null;
-    }
-  }, []);
-
-  const clearScrollOneStartTimer = useCallback(() => {
-    if (scrollOneStartTimerRef.current) {
-      clearTimeout(scrollOneStartTimerRef.current);
-      scrollOneStartTimerRef.current = null;
     }
   }, []);
 
@@ -79,22 +68,11 @@ function useShortsAutoScroll({
     (message) => {
       const wasActive = stateRef.current.active;
       clearContinuousDelay();
-      clearScrollOneStartTimer();
       stateRef.current = createIdleState(stateRef.current.sessionId + 1);
       if (wasActive && message) setAutoScrollNotice(message);
       return wasActive;
     },
-    [clearContinuousDelay, clearScrollOneStartTimer]
-  );
-
-  const armScrollOneWatch = useCallback(
-    (shortId) => {
-      const state = stateRef.current;
-      if (!state.active || state.mode !== "one" || !shortId) return;
-      state.awaitingPlayback = true;
-      state.watchShortId = shortId;
-    },
-    []
+    [clearContinuousDelay]
   );
 
   const scheduleContinuousAdvance = useCallback(
@@ -152,35 +130,16 @@ function useShortsAutoScroll({
 
   const startScrollOne = useCallback(() => {
     stopAutoScroll();
-    if (shortsLength === 0 || !activeId || activeIndex < 0) return false;
+    if (shortsLength === 0 || !activeId || activeIndex < 0 || isAtLastShort()) {
+      return { accepted: false, started: Promise.resolve(false) };
+    }
 
-    stateRef.current = {
-      active: false,
-      mode: "one",
-      awaitingPlayback: true,
-      watchShortId: activeId,
-      lastIndex: activeIndex,
-      sessionId: stateRef.current.sessionId + 1,
-      pendingStart: true,
-    };
+    const moved = goNext();
+    if (!moved) return { accepted: false, started: Promise.resolve(false) };
 
-    const sessionId = stateRef.current.sessionId;
-    window.dispatchEvent(new CustomEvent("shorts-play"));
-    clearScrollOneStartTimer();
-    scrollOneStartTimerRef.current = setTimeout(() => {
-      scrollOneStartTimerRef.current = null;
-      const state = stateRef.current;
-      if (
-        state.mode === "one" &&
-        state.sessionId === sessionId &&
-        state.pendingStart &&
-        state.watchShortId === activeId
-      ) {
-        stopAutoScroll();
-      }
-    }, SCROLL_ONE_START_TIMEOUT_MS);
-    return true;
-  }, [activeId, activeIndex, clearScrollOneStartTimer, shortsLength, stopAutoScroll]);
+    stateRef.current = createIdleState(stateRef.current.sessionId + 1);
+    return { accepted: true, started: Promise.resolve(true) };
+  }, [activeId, activeIndex, goNext, isAtLastShort, shortsLength, stopAutoScroll]);
 
   useEffect(() => {
     const state = stateRef.current;
@@ -207,61 +166,14 @@ function useShortsAutoScroll({
       return;
     }
 
-    if (state.mode === "one") {
-      if (!state.active && state.pendingStart) return;
-      armScrollOneWatch(activeId);
-      return;
-    }
   }, [
     activeId,
     activeIndex,
-    armScrollOneWatch,
     isAtFirstShort,
     isAtLastShort,
     scheduleContinuousAdvance,
     stopAutoScroll,
   ]);
-
-  useEffect(() => {
-    const onPlaybackRunning = (event) => {
-      const state = stateRef.current;
-      if (state.mode !== "one" || !state.awaitingPlayback) return;
-      if (!event.detail?.shortId || event.detail.shortId !== state.watchShortId) return;
-      if (!state.pendingStart && state.active) return;
-
-      clearScrollOneStartTimer();
-      state.pendingStart = false;
-      state.active = true;
-    };
-
-    const onPlaybackComplete = (event) => {
-      const state = stateRef.current;
-      if (!state.active || state.mode !== "one" || !state.awaitingPlayback) return;
-      if (!event.detail?.shortId || event.detail.shortId !== state.watchShortId) return;
-
-      clearScrollOneStartTimer();
-      state.awaitingPlayback = false;
-      state.watchShortId = null;
-      state.pendingStart = false;
-      const sessionId = state.sessionId;
-
-      if (isAtLastShort()) {
-        stopAutoScroll();
-        return;
-      }
-
-      const moved = goNext();
-      if (stateRef.current.sessionId !== sessionId) return;
-      if (!moved) stopAutoScroll();
-    };
-
-    window.addEventListener("shorts-playback-running", onPlaybackRunning);
-    window.addEventListener("shorts-playback-complete", onPlaybackComplete);
-    return () => {
-      window.removeEventListener("shorts-playback-running", onPlaybackRunning);
-      window.removeEventListener("shorts-playback-complete", onPlaybackComplete);
-    };
-  }, [clearScrollOneStartTimer, goNext, isAtLastShort, stopAutoScroll]);
 
   useEffect(() => {
     const onCommand = (event) => {
@@ -270,7 +182,13 @@ function useShortsAutoScroll({
       if (action === "stop") accepted = stopAutoScroll("Auto-scroll stopped");
       else if (action === "scroll-down") accepted = startContinuous("down");
       else if (action === "scroll-up") accepted = startContinuous("up");
-      else if (action === "scroll-one") accepted = startScrollOne();
+      else if (action === "scroll-one") {
+        const result = startScrollOne();
+        accepted = result.accepted;
+        if (event.detail && typeof event.detail === "object") {
+          event.detail.started = result.started;
+        }
+      }
 
       if (event.detail && typeof event.detail === "object") {
         event.detail.accepted = Boolean(accepted);
@@ -311,10 +229,9 @@ function useShortsAutoScroll({
   useEffect(
     () => () => {
       clearContinuousDelay();
-      clearScrollOneStartTimer();
       stopAutoScroll();
     },
-    [clearContinuousDelay, clearScrollOneStartTimer, stopAutoScroll]
+    [clearContinuousDelay, stopAutoScroll]
   );
 
   return { autoScrollNotice, stopAutoScroll };

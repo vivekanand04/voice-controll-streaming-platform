@@ -248,7 +248,7 @@ function Navbar({ openChange }) {
       recognitionRef.current = recognition; // keep reference
     };
 
-    recognition.onresult = (event) => {
+    recognition.onresult = async (event) => {
       if (commandHandled) return;
       const currentResult = event.results[event.resultIndex] || event.results[0];
       const transcriptRaw = currentResult?.[0]?.transcript?.trim() || '';
@@ -271,7 +271,11 @@ function Navbar({ openChange }) {
               recognitionRef.current = null;
               setIsListening(false);
               setVoiceMode(null);
-              setStatusMessage('Scroll One');
+              const started =
+                typeof scrollCommandDetail.started?.then === 'function'
+                  ? await scrollCommandDetail.started
+                  : scrollCommandDetail.active;
+              setStatusMessage(started ? 'Scroll One' : 'Scroll One is not available right now');
             } else {
               setStatusMessage('Scroll One is not available right now');
             }
@@ -298,10 +302,13 @@ function Navbar({ openChange }) {
       if (isShortsRoute && isShortsLocalCommand) {
         const eventName = shortsVoiceAction ? 'shorts-voice-command' : 'voice-command';
         const dispatchShortsCommand = () => {
-          window.dispatchEvent(new CustomEvent(eventName, { detail: transcript }));
+          const detail = shortsVoiceAction
+            ? { action: shortsVoiceAction, transcript, text: transcript }
+            : transcript;
+          window.dispatchEvent(new CustomEvent(eventName, { detail }));
         };
 
-        if (shortsVoiceAction === 'comment') {
+        if (shortsVoiceAction === 'create-comment') {
           try { recognition.stop(); } catch (e) { /* ignore */ }
           recognitionRef.current = null;
           setIsListening(false);
@@ -312,7 +319,9 @@ function Navbar({ openChange }) {
         }
 
         dispatchShortsCommand();
-        setStatusMessage(`Shorts command: "${transcriptRaw}"`);
+        if (shortsVoiceAction === 'open-comments') setStatusMessage('Comments opened.');
+        else if (shortsVoiceAction === 'close-comments') setStatusMessage('Comments closed.');
+        else setStatusMessage(`Shorts command: "${transcriptRaw}"`);
         return;
       }
 

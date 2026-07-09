@@ -322,8 +322,8 @@ function ShortsCard({
       );
     };
 
-    const notifyRunning = () => {
-      if (notifiedRunning || completed) return;
+    const notifyRunning = (force = false) => {
+      if ((!force && notifiedRunning) || completed) return;
       notifiedRunning = true;
       window.dispatchEvent(
         new CustomEvent("shorts-playback-running", { detail: { shortId } })
@@ -355,18 +355,25 @@ function ShortsCard({
     };
 
     const onPlaying = () => {
-      if (getProgressPercent() < 99) notifyRunning();
+      if (!video.ended) notifyRunning();
     };
 
     const onEnded = () => {
       notifyComplete();
     };
 
+    const onPlaybackStateRequest = (event) => {
+      if (event.detail?.shortId && event.detail.shortId !== shortId) return;
+      if (!video.paused && !video.ended && video.readyState >= 2) notifyRunning(true);
+    };
+
+    window.addEventListener("shorts-playback-state-request", onPlaybackStateRequest);
     video.addEventListener("playing", onPlaying);
     video.addEventListener("timeupdate", onTimeUpdate);
     video.addEventListener("ended", onEnded);
 
     return () => {
+      window.removeEventListener("shorts-playback-state-request", onPlaybackStateRequest);
       video.removeEventListener("playing", onPlaying);
       video.removeEventListener("timeupdate", onTimeUpdate);
       video.removeEventListener("ended", onEnded);

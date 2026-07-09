@@ -9,36 +9,42 @@ export const getShortsVoiceAction = (command) => {
   if (text.includes("pause") || text === "stop" || text.includes("stop short")) return "pause";
   if (text.includes("play") || text.includes("resume")) return "play";
   if (text === "like" || text === "like video" || text === "thumbs up"||text==="live") return "like";
-  if (
-    text === "comment" ||
-    text === "comments" ||
-    text === "message" ||
-    text === "messages" ||
-    text.includes("open comments") ||
-    text.includes("create comment") ||
-    text.includes("create message")
-  ) {
-    return "comment";
-  }
+  if (/\b(?:open|show)\s+(?:comment|comments|message|messages)\b/.test(text)) return "open-comments";
+  if (/\b(?:close|hide)\s+(?:comment|comments|message|messages)\b/.test(text)) return "close-comments";
+  if (text.includes("create comment") || text.includes("create message")) return "create-comment";
+  if (text === "comment" || text === "comments" || text === "message" || text === "messages") return "create-comment";
 
   return null;
 };
 
-function useShortsVoiceCommands({ enabled = true, onPlay, onPause, onMute, onUnmute, onLike, onComment }) {
+function useShortsVoiceCommands({
+  enabled = true,
+  onPlay,
+  onPause,
+  onMute,
+  onUnmute,
+  onLike,
+  onComment,
+  onCreateComment,
+  onOpenComments,
+  onCloseComments,
+}) {
   useEffect(() => {
     if (!enabled) return undefined;
 
     const handleCommand = (event) => {
       const detail = event?.detail ?? event;
       const command = typeof detail === "string" ? detail : detail?.text || detail?.transcript || "";
-      const action = getShortsVoiceAction(command);
+      const action = typeof detail === "object" && detail?.action ? detail.action : getShortsVoiceAction(command);
 
       if (action === "play") onPlay?.();
       if (action === "pause") onPause?.();
       if (action === "mute") onMute?.();
       if (action === "unmute") onUnmute?.();
       if (action === "like") onLike?.();
-      if (action === "comment") onComment?.();
+      if (action === "create-comment") (onCreateComment || onComment)?.();
+      if (action === "open-comments") onOpenComments?.();
+      if (action === "close-comments") onCloseComments?.();
     };
 
     window.addEventListener("voice-command", handleCommand);
@@ -48,7 +54,18 @@ function useShortsVoiceCommands({ enabled = true, onPlay, onPause, onMute, onUnm
       window.removeEventListener("voice-command", handleCommand);
       window.removeEventListener("shorts-voice-command", handleCommand);
     };
-  }, [enabled, onComment, onLike, onMute, onPause, onPlay, onUnmute]);
+  }, [
+    enabled,
+    onCloseComments,
+    onComment,
+    onCreateComment,
+    onLike,
+    onMute,
+    onOpenComments,
+    onPause,
+    onPlay,
+    onUnmute,
+  ]);
 }
 
 export default useShortsVoiceCommands;

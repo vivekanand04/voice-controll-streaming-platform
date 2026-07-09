@@ -362,7 +362,6 @@ function ShortsFeed() {
 
   const { autoScrollNotice, stopAutoScroll } = useShortsAutoScroll({
     feedRef,
-    itemRefs,
     activeId,
     activeIndex,
     shortsLength: shorts.length,
@@ -432,8 +431,28 @@ function ShortsFeed() {
     [accessToken, likedShortsStorageKey, shorts, updateShort]
   );
 
-  const handleOpenComments = useCallback((short) => {
-    setCommentDrawerShort(short);
+  const handleOpenComments = useCallback((short, options = {}) => {
+    setCommentDrawerShort((currentShort) => {
+      const nextShortId = getShortId(short);
+      const currentShortId = getShortId(currentShort);
+      if (currentShortId && currentShortId === nextShortId) return currentShort;
+      return short;
+    });
+
+    if (options.fromVoice) {
+      setVoiceCommentMessage("Comments opened.");
+    }
+  }, []);
+
+  const openActiveCommentsByVoice = useCallback(() => {
+    const activeShort = shorts.find((short) => getShortId(short) === activeId);
+    if (!activeShort) return;
+    handleOpenComments(activeShort, { fromVoice: true });
+  }, [activeId, handleOpenComments, shorts]);
+
+  const closeCommentsByVoice = useCallback(() => {
+    setCommentDrawerShort((currentShort) => (currentShort ? null : currentShort));
+    setVoiceCommentMessage("Comments closed.");
   }, []);
 
   const normalizeCommentsResponse = useCallback((payload) => {
@@ -701,7 +720,9 @@ function ShortsFeed() {
     onLike: () => {
       if (activeId) handleLike(activeId);
     },
-    onComment: startVoiceCommentRecorder,
+    onCreateComment: startVoiceCommentRecorder,
+    onOpenComments: openActiveCommentsByVoice,
+    onCloseComments: closeCommentsByVoice,
   });
 
   useEffect(() => {
