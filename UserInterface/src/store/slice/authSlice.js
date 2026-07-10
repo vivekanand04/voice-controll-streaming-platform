@@ -5,6 +5,13 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 const API_BASE = import.meta.env.VITE_API_URL;
+export const LOGOUT_MARKER_KEY = 'indiaTubeLoggedOut';
+
+const getAuthHeader = (state) => {
+    const token = state?.auth?.accessToken;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 const initialState = {
     user: null,
     loading: false,
@@ -34,6 +41,7 @@ export const register = createAsyncThunk(`${API_BASE}/api/v1/account/signup`, as
 export const login = createAsyncThunk(`${API_BASE}/api/v1/account/login`, async (userData, { rejectWithValue }) => {
     try {
         const response = await axios.post(`${API_BASE}/api/v1/account/login`, userData, { withCredentials: true });
+        localStorage.removeItem(LOGOUT_MARKER_KEY);
         return response.data.data;
     } catch (error) {
         return rejectWithValue(error.response?.data?.message || error.message);
@@ -41,13 +49,17 @@ export const login = createAsyncThunk(`${API_BASE}/api/v1/account/login`, async 
 });
 
 
-export const logout = createAsyncThunk(`${API_BASE}/api/v1/account/logout`, async (_, { rejectWithValue }) => {
+export const logout = createAsyncThunk(`${API_BASE}/api/v1/account/logout`, async (_, { getState }) => {
     try {
-        await axios.post(`${API_BASE}/api/v1/account/logout`);
-        return true;
+        await axios.post(`${API_BASE}/api/v1/account/logout`, {}, {
+            headers: getAuthHeader(getState()),
+            withCredentials: true,
+        });
     } catch (error) {
-        return rejectWithValue(error.response.data.message);
+        console.warn('Logout request failed; clearing local session anyway:', error);
     }
+    localStorage.setItem(LOGOUT_MARKER_KEY, 'true');
+    return true;
 });
 
 const authSlice = createSlice({
@@ -56,7 +68,24 @@ const authSlice = createSlice({
     reducers: {
         setUser: (state, action) => {
             state.user = action.payload;
-            state.status = true; // mark as logged in
+            state.status = Boolean(action.payload);
+        },
+        setAuth: (state, action) => {
+            state.user = action.payload?.user || null;
+            state.accessToken = action.payload?.accessToken || null;
+            state.refreshToken = action.payload?.refreshToken || null;
+            state.status = Boolean(action.payload?.user);
+        },
+        setTokens: (state, action) => {
+            state.accessToken = action.payload?.accessToken || state.accessToken;
+            state.refreshToken = action.payload?.refreshToken || state.refreshToken;
+        },
+        clearAuth: (state) => {
+            state.user = null;
+            state.accessToken = null;
+            state.refreshToken = null;
+            state.status = false;
+            state.error = null;
         }
     },
     extraReducers: (builder) => {
@@ -95,15 +124,21 @@ const authSlice = createSlice({
                 return {
                     ...state,
                     status: false,
-                    user: null
+                    user: null,
+                    accessToken: null,
+                    refreshToken: null,
+                    error: null,
                 };
             })
             .addCase(logout.rejected, (state, action) => {
+                state.status = false;
+                state.user = null;
+                state.accessToken = null;
+                state.refreshToken = null;
                 state.error = action.payload;
             });
     },
 });
 
-export const { setUser } = authSlice.actions;
+export const { setUser, setAuth, setTokens, clearAuth } = authSlice.actions;
 export default authSlice.reducer;
-

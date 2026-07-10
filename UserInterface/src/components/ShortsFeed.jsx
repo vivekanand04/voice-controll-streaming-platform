@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useSelector } from "react-redux";
+import { useLocation } from "react-router-dom";
 import ShortsCard from "./ShortsCard";
 import useShortsVoiceCommands from "../hooks/useShortsVoiceCommands";
 import useShortsAutoScroll from "../hooks/useShortsAutoScroll";
@@ -183,9 +184,14 @@ const isUnavailableCommentsEndpoint = (err) => {
 };
 
 function ShortsFeed() {
+  const location = useLocation();
   const accessToken = useSelector((state) => state.auth.accessToken);
   const user = useSelector((state) => state.auth.user);
   const authStatus = useSelector((state) => state.auth.status);
+  const requestedShortId = useMemo(
+    () => new URLSearchParams(location.search).get("short"),
+    [location.search]
+  );
   const likedShortsStorageKey = useMemo(
     () => (authStatus || user ? getShortsLikesStorageKey(user, accessToken) : null),
     [accessToken, authStatus, user]
@@ -246,9 +252,27 @@ function ShortsFeed() {
           withCredentials: true,
         });
         const likedShortIds = readStoredLikedShortIds(likedShortsStorageKey);
-        const nextShorts = (response.data?.data || []).map((short) =>
+        let nextShorts = (response.data?.data || []).map((short) =>
           normalizeShort(short, likedShortIds)
         );
+
+        if (pageToLoad === 0 && requestedShortId) {
+          try {
+            const selectedResponse = await axios.get(`${API_BASE}/api/shorts/${requestedShortId}`, {
+              withCredentials: true,
+            });
+            const selectedShort = selectedResponse.data?.data;
+            if (selectedShort) {
+              const normalizedSelectedShort = normalizeShort(selectedShort, likedShortIds);
+              nextShorts = [
+                normalizedSelectedShort,
+                ...nextShorts.filter((short) => getShortId(short) !== requestedShortId),
+              ];
+            }
+          } catch (err) {
+            console.error("Failed to load requested short", err);
+          }
+        }
 
         setShorts((previous) => {
           const merged = pageToLoad === 0 ? [] : [...previous];
@@ -276,7 +300,7 @@ function ShortsFeed() {
         loadingRef.current = false;
       }
     },
-    [likedShortsStorageKey]
+    [likedShortsStorageKey, requestedShortId]
   );
 
   useEffect(() => {
@@ -287,6 +311,11 @@ function ShortsFeed() {
     if (!shorts.length || activeId) return;
     setActiveId(getShortId(shorts[0]));
   }, [activeId, shorts]);
+
+  useEffect(() => {
+    if (!requestedShortId || !shorts.some((short) => getShortId(short) === requestedShortId)) return;
+    setActiveId(requestedShortId);
+  }, [requestedShortId, shorts]);
 
   const incrementView = useCallback((shortId) => {
     if (!shortId || viewedRef.current.has(shortId)) return;

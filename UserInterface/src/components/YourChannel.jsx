@@ -1,46 +1,32 @@
-
-
-
-
-
 import React, { useState, useEffect } from "react";
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useLocation, useSearchParams } from "react-router-dom";
 import { useSelector } from "react-redux";
-// import axios from "axios";
-// import "./api/axios"; 
 import axios from "../api/axios";
+import defaultAvatar from "../assets/profile-picture-5.jpg";
 
 const API_BASE = import.meta.env.VITE_API_URL;
+const CONTENT_TABS = [
+  { id: "all", label: "All", to: "/your_channel" },
+  { id: "videos", label: "Videos", to: "/your_channel?tab=videos" },
+  { id: "shorts", label: "Shorts", to: "/your_channel?tab=shorts" },
+];
+
 function YourChannel() {
-  const data = useSelector((state) => {
-   // in component or dev console
-console.log('auth slice:', {
-  status: state.auth.status,
-  loading: state.auth.loading,
-  userPresent: !!state.auth.user,
-  persisted: state._persist?.rehydrated
-});
-
-  return  state.auth.user
-  });
-
-
+  const data = useSelector((state) => state.auth.user);
+  const accessToken = useSelector((state) => state.auth.accessToken);
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [userdata, setUserData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState(null);
-
-  // Development fallback — remove or change in production
-  // const FALLBACK_ID = "68c0014613d132a0b12ca4fa";
-  // const API_BASE = "http://localhost:5000";
+  const tabFromUrl = searchParams.get("tab");
+  const activeContentTab = CONTENT_TABS.some((tab) => tab.id === tabFromUrl) ? tabFromUrl : "all";
+  const isContentRoute = location.pathname === "/your_channel" || location.pathname === "/your_channel/";
 
   useEffect(() => {
-    // If you want to always test a hard-coded id in dev, don't early-return.
-    // If you want to fetch only when redux user exists, restore the guard.
     const idToFetch = data?._id;
-    // const idToFetch = data?._id ?? data?.id ?? data?.userId;
-    console.log("the data are",data)
     if (!idToFetch) {
-      console.debug("No id available to fetch");
+      setUserData(null);
       return;
     }
 
@@ -48,50 +34,35 @@ console.log('auth slice:', {
     const fetchUser = async () => {
       setLoading(true);
       setFetchError(null);
-      try {
-        const url = `${API_BASE}/api/v1/account/userData/${idToFetch}`;
-        console.log("the vale of response are",url)
-        const headers = { "Content-Type": "application/json" };
-        const hasToken = Boolean(data?.token);
-        if (hasToken) {
-          headers.Authorization = `Bearer ${data.token}`;
-          console.debug("Sending Authorization bearer token");
-        } else {
-          console.debug("No token present; request will include cookies if server expects it (withCredentials true)");
-        }
+      setUserData(data);
 
-        const response = await axios.get(url, {
-          headers,
-          withCredentials: !hasToken, // include cookies only if no token
+      try {
+        const response = await axios.get(`${API_BASE}/api/v1/account/userData/${idToFetch}`, {
+          headers: {
+            "Content-Type": "application/json",
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
+          withCredentials: true,
           signal: controller.signal,
         });
 
-        console.debug("Axios response status", response.status);
-        console.debug("Axios response.data:", response.data);
-
-        // adjust depending on your backend
         const userObj = response?.data?.data ?? response?.data ?? null;
-
         if (!userObj) {
-          setFetchError("Server returned no user object — check response shape in network/Postman.");
-          setUserData(null);
-          console.warn("Unexpected response shape:", response.data);
+          setFetchError("Server returned no user object.");
         } else {
           setUserData(userObj);
         }
       } catch (err) {
-        if (err.name === "CanceledError" || err.message === "canceled") {
-          console.log("Request aborted");
-        } else {
+        if (err.name !== "CanceledError" && err.message !== "canceled") {
           console.error("Fetch error:", err);
           if (err.response) {
             setFetchError(`Server ${err.response.status}: ${JSON.stringify(err.response.data)}`);
           } else if (err.request) {
-            setFetchError("No response received — network/CORS/server down.");
+            setFetchError("No response received - network/CORS/server down.");
           } else {
             setFetchError(err.message);
           }
-          setUserData(null);
+          setUserData(data);
         }
       } finally {
         setLoading(false);
@@ -103,12 +74,8 @@ console.log('auth slice:', {
     return () => {
       controller.abort();
     };
-    // If you want to re-run when token or id changes:
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?._id, data?.token]);
+  }, [accessToken, data]);
 
-
-  
   const formatDate = (dateString) => {
     if (!dateString) return "";
     const options = { year: "numeric", month: "long" };
@@ -121,19 +88,19 @@ console.log('auth slice:', {
       <div className="lg:mt-8 bg-white grid grid-cols-1 px-8 pt-6 xl:grid-cols-3 xl:gap-4">
         <div className="mb-4 col-span-full xl:mb-2">
           <div className="mt-4 flex items-center gap-5">
-            {loading ? (
+            {loading && !userdata ? (
               <div>Loading user data...</div>
-            ) : fetchError ? (
+            ) : fetchError && !userdata ? (
               <div className="text-sm text-red-600">Error: {fetchError}</div>
             ) : userdata ? (
               <>
                 <img
                   className="w-28 h-28 rounded-full object-cover"
-                  src={userdata.avatar || "/fallback-avatar.png"}
+                  src={userdata.avatar || defaultAvatar}
                   alt={userdata.name || "avatar"}
                   onError={(e) => {
                     e.currentTarget.onerror = null;
-                    e.currentTarget.src = "/fallback-avatar.png";
+                    e.currentTarget.src = defaultAvatar;
                   }}
                 />
                 <div className="font-bold text-black">
@@ -156,16 +123,29 @@ console.log('auth slice:', {
             )}
           </div>
 
-          {/* tabs */}
           <div className="border-b border-gray-200 mt-6">
             <ul className="flex flex-wrap -mb-px text-sm font-medium text-center text-gray-500">
+              {CONTENT_TABS.map((tab) => {
+                const selected = isContentRoute && activeContentTab === tab.id;
+                return (
+                  <li key={tab.id} className="me-2">
+                    <Link
+                      to={tab.to}
+                      role="tab"
+                      aria-selected={selected}
+                      className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg ${
+                        selected
+                          ? "border-gray-950 text-gray-950"
+                          : "border-transparent hover:text-gray-600 hover:border-gray-300"
+                      }`}
+                    >
+                      {tab.label}
+                    </Link>
+                  </li>
+                );
+              })}
               <li className="me-2">
-                <Link to={""} className="inline-flex items-center justify-center p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300">
-                  All Videos
-                </Link>
-              </li>
-              <li className="me-2">
-                <Link to={"upload_video"} className="inline-flex items-center justify-center p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300">
+                <Link to={"/your_channel/upload_video"} className="inline-flex items-center justify-center p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300">
                   Upload Video
                 </Link>
               </li>
@@ -180,5 +160,3 @@ console.log('auth slice:', {
 }
 
 export default YourChannel;
-
-

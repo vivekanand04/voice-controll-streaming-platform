@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import React from 'react';
 import logo from '../assets/file.svg';
+import defaultAvatar from '../assets/profile-picture-5.jpg';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../store/slice/authSlice';
@@ -25,6 +26,7 @@ function Navbar({ openChange }) {
   const location = useLocation();
   const authStatus = useSelector((state) => state.auth.status);
   const data = useSelector((state) => state.auth.user);
+  const accessToken = useSelector((state) => state.auth.accessToken);
   const [statusMessage, setStatusMessage] = useState('');
   const isShortsRoute = location.pathname.startsWith('/shorts');
 
@@ -154,7 +156,11 @@ function Navbar({ openChange }) {
 
   const toggleSidebar = () => { openChange(); };
   const toggleDropdown = () => { setDropdownVisible(!dropdownVisible); };
-  const handleSignOut = () => { dispatch(logout()); };  
+  const handleSignOut = async () => {
+    await dispatch(logout());
+    setDropdownVisible(false);
+    navigate('/home');
+  };  
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -515,17 +521,27 @@ function Navbar({ openChange }) {
   };
 
   useEffect(() => {
-    if (!data || !data._id) return;
+    if (!authStatus || !data?._id) {
+      setUserData(null);
+      return;
+    }
+
     const fetchUser = async () => {
       try {
-        const response = await axios.get(`http://localhost:5000/api/v1/account/userData/${data._id}`);
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/v1/account/userData/${data._id}`, {
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+          withCredentials: true,
+        });
         setUserData(response.data.data);
       } catch (error) {
         console.error('Error fetching user data:', error);
+        setUserData(data);
       }
     };
     fetchUser();
-  }, [data]);
+  }, [accessToken, authStatus, data]);
+
+  const currentUser = userdata || data;
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-[500] w-full bg-white border-b border-gray-200">
@@ -585,14 +601,22 @@ function Navbar({ openChange }) {
               {authStatus ? (
                 <>
                   <button type="button" className="flex text-sm rounded-full focus:ring-4 focus:ring-gray-300" onClick={toggleDropdown} aria-haspopup="true" aria-expanded={dropdownVisible}>
-                    {userdata ? <img className="w-8 h-8 rounded-full" src={userdata.avatar} alt="User" /> : <div className="w-8 h-8 bg-gray-300 rounded-full animate-pulse" />}
+                    <img
+                      className="w-8 h-8 rounded-full object-cover"
+                      src={currentUser?.avatar || defaultAvatar}
+                      alt={currentUser?.name || 'User'}
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = defaultAvatar;
+                      }}
+                    />
                   </button>
 
                   {dropdownVisible && (
                     <div className="absolute right-0 mt-2 w-48 text-base bg-white divide-y divide-gray-100 rounded shadow-lg">
                       <div className="px-4 py-3">
-                        <p className="text-sm">{userdata?.name}</p>
-                        <p className="text-sm font-medium text-gray-900 truncate">{userdata?.email}</p>
+                        <p className="text-sm">{currentUser?.name || 'User'}</p>
+                        <p className="text-sm font-medium text-gray-900 truncate">{currentUser?.email || ''}</p>
                       </div>
                       <ul className="py-1">
                         <li><Link to="/your_channel" className="block px-4 py-2 text-sm hover:bg-gray-100">Dashboard</Link></li>

@@ -2,8 +2,10 @@ import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom'
 import React, { useState } from 'react';
 import ShortsUpload from './ShortsUpload';
+import { useSelector } from 'react-redux';
 const API_BASE = import.meta.env.VITE_API_URL;
 function UploadVideo() {
+    const accessToken = useSelector((state) => state.auth.accessToken);
     const [isModalOpen, setIsModalOpen] = useState(true);
     const [uploadType, setUploadType] = useState('video');
     const [title, setTitle] = useState("");
@@ -38,10 +40,8 @@ function UploadVideo() {
         try {
             setLoader(true)
             const res = await axios.post(`${API_BASE}/api/v1/videos/publish`, formData, {
-                // headers: {
-                //     'Content-Type': 'multipart/form-data'
-                // }
-                 withCredentials: true
+                headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+                withCredentials: true
             });
 
             alert("Successfully Video Uploaded");
