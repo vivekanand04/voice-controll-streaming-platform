@@ -1,9 +1,13 @@
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom'
 import React, { useState } from 'react';
+import ShortsUpload from './ShortsUpload';
+import { useSelector } from 'react-redux';
 const API_BASE = import.meta.env.VITE_API_URL;
 function UploadVideo() {
+    const accessToken = useSelector((state) => state.auth.accessToken);
     const [isModalOpen, setIsModalOpen] = useState(true);
+    const [uploadType, setUploadType] = useState('video');
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [thumbnail, setThumbnail] = useState(null);
@@ -36,10 +40,8 @@ function UploadVideo() {
         try {
             setLoader(true)
             const res = await axios.post(`${API_BASE}/api/v1/videos/publish`, formData, {
-                // headers: {
-                //     'Content-Type': 'multipart/form-data'
-                // }
-                 withCredentials: true
+                headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+                withCredentials: true
             });
 
             alert("Successfully Video Uploaded");
@@ -90,66 +92,91 @@ function UploadVideo() {
                                 <span className="sr-only">Close modal</span>
                             </button>
                         </div>
-                        <form onSubmit={handleSubmit} className="p-4 md:p-5">
-                            <div className="grid gap-4 mb-4 grid-cols-2">
-                                <div className="col-span-2">
-                                    <label htmlFor="title" className="block mb-2 text-sm font-medium text-gray-900">Title</label>
-                                    <input
-                                        type="text"
-                                        name="title"
-                                        id="title"
-                                        value={title}
-                                        onChange={(e) => setTitle(e.target.value)}
-                                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5"
-                                        placeholder="Enter video title"
-                                        required
-                                    />
-                                </div>
-                                <div className="col-span-2">
-                                    <label htmlFor="thumbnail" className="block mb-2 text-sm font-medium text-gray-900">Thumbnail</label>
-                                    <input
-                                        type="file"
-                                        name="thumbnail"
-                                        id="thumbnail"
-                                        onChange={handleThumbnailChange}
-                                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5"
-                                        required
-                                    />
-                                </div>
-                                <div className="col-span-2">
-                                    <label htmlFor="videoFile" className="block mb-2 text-sm font-medium text-gray-900">Video</label>
-                                    <input
-                                        type="file"
-                                        name="videoFile"
-                                        id="videoFile"
-                                        onChange={handleVideoFileChange}
-                                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5"
-                                        required
-                                    />
-                                </div>
-                                <div className="col-span-2">
-                                    <label htmlFor="description" className="block mb-2 text-sm font-medium text-gray-900">Description</label>
-                                    <textarea
-                                        id="description"
-                                        rows="4"
-                                        value={description}
-                                        onChange={(e) => setDescription(e.target.value)}
-                                        className="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="Enter video description"
-                                        required
-                                    ></textarea>
-                                </div>
-                            </div>
+                        <div className="mb-4 flex flex-wrap gap-2">
                             <button
-                                type="submit"
-                                className="text-white inline-flex items-center bg-gray-700 hover:bg-gray-900 focus:ring-4 focus:outline-none focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center"
+                                type="button"
+                                className={`rounded-full px-4 py-2 text-sm font-semibold ${uploadType === 'video' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+                                onClick={() => setUploadType('video')}
                             >
-                                <svg className="me-1 -ms-1 w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                                    <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd"></path>
-                                </svg>
                                 Upload Video
                             </button>
-                        </form>
+                            <button
+                                type="button"
+                                className={`rounded-full px-4 py-2 text-sm font-semibold ${uploadType === 'short' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+                                onClick={() => setUploadType('short')}
+                            >
+                                Upload Short
+                            </button>
+                        </div>
+                        {uploadType === 'video' ? (
+                            <form onSubmit={handleSubmit} className="p-4 md:p-5">
+                                <div className="grid gap-4 mb-4 grid-cols-2">
+                                    <div className="col-span-2">
+                                        <label htmlFor="title" className="block mb-2 text-sm font-medium text-gray-900">Title</label>
+                                        <input
+                                            type="text"
+                                            name="title"
+                                            id="title"
+                                            value={title}
+                                            onChange={(e) => setTitle(e.target.value)}
+                                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5"
+                                            placeholder="Enter video title"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label htmlFor="thumbnail" className="block mb-2 text-sm font-medium text-gray-900">Thumbnail</label>
+                                        <input
+                                            type="file"
+                                            name="thumbnail"
+                                            id="thumbnail"
+                                            onChange={handleThumbnailChange}
+                                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label htmlFor="videoFile" className="block mb-2 text-sm font-medium text-gray-900">Video</label>
+                                        <input
+                                            type="file"
+                                            name="videoFile"
+                                            id="videoFile"
+                                            onChange={handleVideoFileChange}
+                                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label htmlFor="description" className="block mb-2 text-sm font-medium text-gray-900">Description</label>
+                                        <textarea
+                                            id="description"
+                                            rows="4"
+                                            value={description}
+                                            onChange={(e) => setDescription(e.target.value)}
+                                            className="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="Enter video description"
+                                            required
+                                        ></textarea>
+                                    </div>
+                                </div>
+                                <button
+                                    type="submit"
+                                    className="text-white inline-flex items-center bg-gray-700 hover:bg-gray-900 focus:ring-4 focus:outline-none focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center"
+                                >
+                                    <svg className="me-1 -ms-1 w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                        <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd"></path>
+                                    </svg>
+                                    Upload Video
+                                </button>
+                            </form>
+                        ) : (
+                            <div className="p-4 md:p-5">
+                                <ShortsUpload onUploadSuccess={() => {
+                                    setLoader(false);
+                                    setIsModalOpen(false);
+                                }} />
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

@@ -4,11 +4,14 @@
 import { useState, useEffect, useRef } from 'react';
 import React from 'react';
 import logo from '../assets/file.svg';
-import { Link, useNavigate } from 'react-router-dom';
+import defaultAvatar from '../assets/profile-picture-5.jpg';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../store/slice/authSlice';
 import axios from 'axios';
 import { FiUpload, FiFileText } from "react-icons/fi";
+import { getShortsVoiceAction } from '../hooks/useShortsVoiceCommands';
+import { getShortsScrollAction } from '../hooks/useShortsAutoScroll';
 
 function Navbar({ openChange }) {
   const [userdata, setUserData] = useState(null);
@@ -20,9 +23,12 @@ function Navbar({ openChange }) {
   const searchInputRef = useRef(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const authStatus = useSelector((state) => state.auth.status);
   const data = useSelector((state) => state.auth.user);
+  const accessToken = useSelector((state) => state.auth.accessToken);
   const [statusMessage, setStatusMessage] = useState('');
+  const isShortsRoute = location.pathname.startsWith('/shorts');
 
   // recognition refs
   const recognitionRef = useRef(null);
@@ -150,12 +156,29 @@ function Navbar({ openChange }) {
 
   const toggleSidebar = () => { openChange(); };
   const toggleDropdown = () => { setDropdownVisible(!dropdownVisible); };
-  const handleSignOut = () => { dispatch(logout()); };  
+  const handleSignOut = async () => {
+    await dispatch(logout());
+    setDropdownVisible(false);
+    navigate('/home');
+  };  
 
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchText.trim()) navigate(`/search/${encodeURIComponent(searchText.trim())}`);
   };
+
+  useEffect(() => {
+    if (!isShortsRoute && voiceMode === 'command' && recognitionRef.current?.continuous) {
+      try { recognitionRef.current.stop(); } catch (e) { }
+    }
+  }, [isShortsRoute, voiceMode]);
+
+  useEffect(() => {
+    return () => {
+      try { recognitionRef.current?.abort(); } catch (e) { }
+      try { queryRecRef.current?.abort(); } catch (e) { }
+    };
+  }, []);
 
   useEffect(() => {
     if (mobileSearchOpen) {
@@ -208,7 +231,7 @@ function Navbar({ openChange }) {
   const startCommandRecognition = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert('Your browser does not support voice commands.');
+      setStatusMessage('Voice commands are not supported in this browser.');
       return;
     }
 
@@ -221,7 +244,9 @@ function Navbar({ openChange }) {
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
     recognition.interimResults = false;
+    recognition.continuous = isShortsRoute;
     recognition.maxAlternatives = 1;
+    let commandHandled = false;
 
     recognition.onstart = () => {
       setIsListening(true);
@@ -229,10 +254,82 @@ function Navbar({ openChange }) {
       recognitionRef.current = recognition; // keep reference
     };
 
-    recognition.onresult = (event) => {
-      const transcriptRaw = event.results[0][0].transcript.trim();
+    recognition.onresult = async (event) => {
+      if (commandHandled) return;
+      const currentResult = event.results[event.resultIndex] || event.results[0];
+      const transcriptRaw = currentResult?.[0]?.transcript?.trim() || '';
+      if (!transcriptRaw) return;
       const transcript = transcriptRaw.toLowerCase();
       console.log('navbar transcript:', transcript);
+
+      if (isShortsRoute) {
+        const shortsScrollAction = getShortsScrollAction(transcript);
+        if (shortsScrollAction) {
+          const scrollCommandDetail = { action: shortsScrollAction, accepted: false };
+          window.dispatchEvent(
+            new CustomEvent('shorts-scroll-command', { detail: scrollCommandDetail })
+          );
+
+          if (shortsScrollAction === 'scroll-one') {
+            if (scrollCommandDetail.accepted) {
+              commandHandled = true;
+              try { recognition.stop(); } catch (e) { /* ignore */ }
+              recognitionRef.current = null;
+              setIsListening(false);
+              setVoiceMode(null);
+              const started =
+                typeof scrollCommandDetail.started?.then === 'function'
+                  ? await scrollCommandDetail.started
+                  : scrollCommandDetail.active;
+              setStatusMessage(started ? 'Scroll One' : 'Scroll One is not available right now');
+            } else {
+              setStatusMessage('Scroll One is not available right now');
+            }
+            return;
+          }
+
+          if (shortsScrollAction === 'stop') setStatusMessage(scrollCommandDetail.accepted ? 'Auto-scroll stopped' : 'No auto-scroll is running');
+          else if (shortsScrollAction === 'scroll-down') setStatusMessage('Scrolling Shorts down');
+          else if (shortsScrollAction === 'scroll-up') setStatusMessage('Scrolling Shorts up');
+          return;
+        }
+      }
+
+      const shortsVoiceAction = getShortsVoiceAction(transcript);
+      const isShortsLocalCommand =
+        shortsVoiceAction ||
+        transcript.includes('next') ||
+        transcript.includes('swipe up') ||
+        transcript.includes('previous') ||
+        transcript.includes('swipe down') ||
+        transcript.includes('comment') ||
+        transcript.includes('like');
+
+      if (isShortsRoute && isShortsLocalCommand) {
+        const eventName = shortsVoiceAction ? 'shorts-voice-command' : 'voice-command';
+        const dispatchShortsCommand = () => {
+          const detail = shortsVoiceAction
+            ? { action: shortsVoiceAction, transcript, text: transcript }
+            : transcript;
+          window.dispatchEvent(new CustomEvent(eventName, { detail }));
+        };
+
+        if (shortsVoiceAction === 'create-comment') {
+          try { recognition.stop(); } catch (e) { /* ignore */ }
+          recognitionRef.current = null;
+          setIsListening(false);
+          setVoiceMode(null);
+          setStatusMessage('Recording Shorts comment...');
+          setTimeout(dispatchShortsCommand, 120);
+          return;
+        }
+
+        dispatchShortsCommand();
+        if (shortsVoiceAction === 'open-comments') setStatusMessage('Comments opened.');
+        else if (shortsVoiceAction === 'close-comments') setStatusMessage('Comments closed.');
+        else setStatusMessage(`Shorts command: "${transcriptRaw}"`);
+        return;
+      }
 
       // Stop this recognition right away so other components can start their own (prevents contention)
       try { recognition.stop(); } catch (e) { /* ignore */ }
@@ -268,6 +365,11 @@ function Navbar({ openChange }) {
       if (wordNumber && wordNumber > 0) {
         window.dispatchEvent(new CustomEvent('play-index', { detail: { index: wordNumber } }));
         setStatusMessage(`Playing video #${wordNumber}`);
+        return;
+      }
+
+      // Shorts feed handles its own scroll voice commands; never start window scroll there.
+      if (isShortsRoute && transcript.includes('scroll')) {
         return;
       }
 
@@ -352,6 +454,7 @@ function Navbar({ openChange }) {
 
     recognition.onerror = (ev) => {
       console.error('recognition error', ev);
+      setStatusMessage('Voice command recognition error.');
     };
     recognition.onend = () => {
       setIsListening(false);
@@ -418,17 +521,27 @@ function Navbar({ openChange }) {
   };
 
   useEffect(() => {
-    if (!data || !data._id) return;
+    if (!authStatus || !data?._id) {
+      setUserData(null);
+      return;
+    }
+
     const fetchUser = async () => {
       try {
-        const response = await axios.get(`http://localhost:5000/api/v1/account/userData/${data._id}`);
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/v1/account/userData/${data._id}`, {
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+          withCredentials: true,
+        });
         setUserData(response.data.data);
       } catch (error) {
         console.error('Error fetching user data:', error);
+        setUserData(data);
       }
     };
     fetchUser();
-  }, [data]);
+  }, [accessToken, authStatus, data]);
+
+  const currentUser = userdata || data;
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-[500] w-full bg-white border-b border-gray-200">
@@ -488,14 +601,22 @@ function Navbar({ openChange }) {
               {authStatus ? (
                 <>
                   <button type="button" className="flex text-sm rounded-full focus:ring-4 focus:ring-gray-300" onClick={toggleDropdown} aria-haspopup="true" aria-expanded={dropdownVisible}>
-                    {userdata ? <img className="w-8 h-8 rounded-full" src={userdata.avatar} alt="User" /> : <div className="w-8 h-8 bg-gray-300 rounded-full animate-pulse" />}
+                    <img
+                      className="w-8 h-8 rounded-full object-cover"
+                      src={currentUser?.avatar || defaultAvatar}
+                      alt={currentUser?.name || 'User'}
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = defaultAvatar;
+                      }}
+                    />
                   </button>
 
                   {dropdownVisible && (
                     <div className="absolute right-0 mt-2 w-48 text-base bg-white divide-y divide-gray-100 rounded shadow-lg">
                       <div className="px-4 py-3">
-                        <p className="text-sm">{userdata?.name}</p>
-                        <p className="text-sm font-medium text-gray-900 truncate">{userdata?.email}</p>
+                        <p className="text-sm">{currentUser?.name || 'User'}</p>
+                        <p className="text-sm font-medium text-gray-900 truncate">{currentUser?.email || ''}</p>
                       </div>
                       <ul className="py-1">
                         <li><Link to="/your_channel" className="block px-4 py-2 text-sm hover:bg-gray-100">Dashboard</Link></li>

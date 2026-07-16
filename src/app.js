@@ -15,14 +15,14 @@ app.set('trust proxy', 1); // if behind proxy/load-balancer
 
 app.use(cookieParser())
 app.use(cors({
-  origin:process.env.FRONTEND_URL || 'http://localhost:5173',   // your React app
+  origin:process.env.FRONTEND_URL || 'http://localhost:5174',   // your React app
   methods: ["GET","POST","PUT","DELETE"],
   credentials: true,
     // allowedHeaders: ["Content-Type", "Authorization", "Accept"]
 }));
 // app.options("*", cors());
 
-console.log("the value of mogodb uri is",process.env.MONGODB_URI);
+// console.log("the value of mogodb uri is",process.env.MONGODB_URI);
 
 
 // app.use(bodyParser.json())

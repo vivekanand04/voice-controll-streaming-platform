@@ -20,8 +20,13 @@ const COMMANDS = [
   { id: 16, command: 'Toggle like (thumbs up)', examples: ['thumbs up', 'toggle thumbs', 'like'], action: 'Likes or unlikes the current video' },
   { id: 17, command: 'Toggle subscribe', examples: ['toggle subscribe', 'subscribe'], action: 'Subscribes/unsubscribes to channel' },
   { id: 18, command: 'Upload', examples: ['upload', 'upload video'], action: 'Navigate to upload page' },
-  { id: 19, command: 'Volume decrease', examples: ['decrease volume', 'volume down'], action: 'Lowers volume slightly' },
-  { id: 20, command: 'Volume increase', examples: ['increase volume', 'volume up'], action: 'Raises volume slightly' }
+  { id: 19, command: 'Shorts navigation', examples: ['next short', 'previous short', 'swipe up'], action: 'Navigate the shorts feed' },
+  { id: 20, command: 'Like short', examples: ['like this short', 'like short'], action: 'Like the current short' },
+  { id: 21, command: 'Comment short', examples: ['comment nice video', 'comment on this short'], action: 'Add a comment to the current short' },
+  { id: 22, command: 'Mute / Unmute short', examples: ['mute short', 'unmute short'], action: 'Toggle shorts audio' },
+  { id: 23, command: 'Subscribe creator', examples: ['subscribe creator', 'subscribe to this channel'], action: 'Subscribe to the current short creator' },
+  { id: 24, command: 'Volume decrease', examples: ['decrease volume', 'volume down'], action: 'Lowers volume slightly' },
+  { id: 25, command: 'Volume increase', examples: ['increase volume', 'volume up'], action: 'Raises volume slightly' }
 ]
 
 COMMANDS.sort((a, b) => a.command.localeCompare(b.command));

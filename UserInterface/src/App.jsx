@@ -6,8 +6,18 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import "./api/axios"; 
 import { useDispatch } from "react-redux";
-import { setUser } from "./store/slice/authSlice"; // you need this action
+import { LOGOUT_MARKER_KEY, setAuth } from "./store/slice/authSlice";
 const API_BASE = import.meta.env.VITE_API_URL;
+
+const getJwtPayload = (token) => {
+  try {
+    const payload = token?.split(".")?.[1];
+    return payload ? JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/"))) : null;
+  } catch (error) {
+    return null;
+  }
+};
+
 function App() {
   const [isOpen, setIsOpen] = useState(true);
   const dispatch = useDispatch();
@@ -25,13 +35,28 @@ function App() {
   useEffect(() => {
     // Refresh token on app load - don't redirect on failure, just set user if successful
     const checkLogin = async () => {
+      if (localStorage.getItem(LOGOUT_MARKER_KEY)) return;
+
       try {
         const res = await axios.post(
           `${API_BASE}/api/v1/account/refreshtoken`,
           {},
           { withCredentials: true }
         );
-        dispatch(setUser(res.data.data.user));  
+        const tokens = res.data?.data || {};
+        const userId = getJwtPayload(tokens.accessToken)?._id;
+        if (!userId) return;
+
+        const userRes = await axios.get(`${API_BASE}/api/v1/account/userData/${userId}`, {
+          headers: { Authorization: `Bearer ${tokens.accessToken}` },
+          withCredentials: true,
+        });
+
+        dispatch(setAuth({
+          user: userRes.data?.data,
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+        }));
       } catch (err) {
         // User is not logged in - this is fine, don't redirect
         console.log("No active login session");
@@ -62,4 +87,3 @@ function App() {
 }
 
 export default App;
-

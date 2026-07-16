@@ -82,6 +82,7 @@ web_modules/
 .env.test.local
 .env.production.local
 .env.local
+userinterface/.env
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -148,3 +149,16 @@ dist
 interviewAnswer.txt
 interviewQuestions.txt
 *.interview*
+
+
+
+**/application.yml
+**/application-*.yml
+
+
+application.yml
+application-*.yml
+
+# Other sensitive files
+secrets.yml
+config/secrets/

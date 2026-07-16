@@ -14,6 +14,7 @@ function Sidebar({ hidden }) {
 
     const authStatus = useSelector((state) => state.auth.status)
     const user = useSelector((state) => state.auth.user);
+    const accessToken = useSelector((state) => state.auth.accessToken);
     const backupImage = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQFIO8i8i3D60705OwMtBDweKC3aTIkThlqQw&s"
 
     const [subscriptions, setSubscriptions] = useState([])
@@ -58,7 +59,12 @@ function Sidebar({ hidden }) {
     //     return () => controller.abort()
     // }, [authStatus, user?.token])
     useEffect(() => {
-        if (!authStatus) return;
+        if (!authStatus) {
+            setSubscriptions([]);
+            setSubsError(null);
+            setLoadingSubs(false);
+            return;
+        }
 
         const controller = new AbortController();
 
@@ -67,18 +73,15 @@ function Sidebar({ hidden }) {
             setSubsError(null);
 
             try {
-                const headers = { 'Content-Type': 'application/json' };
-                const hasToken = !!user?.token;
-
-                if (hasToken) {
-                    headers['Authorization'] = `Bearer ${user.token}`;
-                }
+                const headers = {
+                    'Content-Type': 'application/json',
+                    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+                };
 
                 const res = await fetch(`${API_BASE}/api/v1/subs/mine`, {
                     method: 'GET',
                     headers,
-                    // if you rely on session cookies, include credentials
-                    ...(hasToken ? {} : { credentials: 'include' }),
+                    credentials: 'include',
                     signal: controller.signal,
                 });
 
@@ -115,7 +118,7 @@ function Sidebar({ hidden }) {
 
         fetchSubs();
         return () => controller.abort();
-    }, [authStatus, user?.token]);
+    }, [accessToken, authStatus, user?._id]);
 
 
     const navItems = [
