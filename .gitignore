@@ -158,6 +158,7 @@ interviewQuestions.txt
 
 application.yml
 application-*.yml
+backend-java/src/main/resources/application.yml
 
 # Other sensitive files
 secrets.yml
