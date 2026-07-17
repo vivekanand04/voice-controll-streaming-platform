@@ -1,0 +1,28 @@
+server:
+  port: ${PORT:8081}
+
+spring:
+  data:
+    mongodb:
+      uri: ${MONGODB_URI}
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 500MB
+
+app:
+  shorts:
+    max-duration-seconds: ${SHORTS_MAX_DURATION:600}
+  storage:
+    base-path: ${SHORTS_STORAGE_PATH:./shorts-storage}
+    base-url: ${SHORTS_PUBLIC_URL:http://localhost:8081/media}
+  cors:
+    allowed-origins: ${FRONTEND_URL:http://localhost:5173}
+  cloudinary:
+    cloud-name: ${CLOUDINARY_CLOUD_NAME}
+    api-key: ${CLOUDINARY_API_KEY}
+    api-secret: ${CLOUDINARY_API_SECRET}
+    enabled: ${CLOUDINARY_ENABLED:true}
+
+jwt:
+  secret: ${ACCESS_TOKEN_SECRET}
